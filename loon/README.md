@@ -1,58 +1,52 @@
-# Loon 插件方案
+# Loon 插件说明
 
-文件：
-
+核心文件：
 - `loon/douyin-live-switch.plugin`
 - `loon/loon_capture_douyin_stream.js`
-- `loon/loon_rewrite_douyin_response.js`
-- `loon/loon_redirect_douyin_stream.js`
+- `loon/loon_capture_toggle_sync.js`
+- `loon/loon_rewrite_douyin_dispatch_json.js`
+- `loon/loon_rewrite_douyin_location.js`
+- `loon/loon_redirect_douyin_direct_request.js`
 
-## 功能
+## 当前逻辑
 
-1. 抓取链接
+1. 抓取
 
-- 重点抓第一跳 `302 Location` 里的 IP FLV
-- 备份抓第二跳实际请求到的 IP FLV
-- 保留原始 `http://IP/域名/...` 形式，不做 HTTPS 规范化
+- `抓取开关` 打开后，只锁定第一条命中的目标流。
+- 同一条流里如果先命中较弱的 `200 直连`，后面又来了更强的 `调度 JSON` 或 `302`，会自动升级成更准确的目标。
+- `抓取开关` 关闭后会立刻解锁；再次打开时，下一条新的直播流会重新抓取。
 
-2. 重写返回内容
+2. 替换
 
-- 重写抖音直播接口返回体里的 FLV 地址
-- 改写 CDN FLV 请求返回的 `302 Location`
-- 把原始直播内容替换成你指定的目标流
+- 如果当前抓到的是 `302` 目标，就改第一跳响应里的 `Location`。
+- 如果当前抓到的是 `调度 JSON` 目标，就改响应体里的 `complete_url`、`ip`、`port`。
+- 如果当前抓到的是 `200 直连` 目标，就改同类直连请求本身。
 
-3. 请求兜底重定向
+3. 兼容范围
 
-- 如果播放器已经开始请求原始 FLV
-- 直接把这个请求改到替换流
+- Host：`*.douyincdn.com`、`*.flive.douyincdn.com`、`*.douyinliving.com`
+- 路径：`third`、`stage`、`thirdgame`、`fantasy` 以及同类 `.flv` 路径
+- 入口类型：
+  - `302 Location`
+  - `200 application/json` 调度响应
+  - `200 video/x-flv` 直连响应
 
-## 用法
+## 使用方法
 
 1. 在 Loon 中导入 `douyin-live-switch.plugin`
-2. 打开插件配置
-3. 你只需要看 3 个项：
-   `抓取开关`
-   `替换开关`
-   `替换 FLV 地址`
-4. 想先观察原始直播流：
-   打开 `抓取开关`
-   关闭 `替换开关`
-5. 想替换直播内容：
-   打开 `替换开关`
-   可选填写 `替换 FLV 地址`
-   如果这里留空，插件会自动使用最近抓到的 FLV 链接
-6. 进入抖音直播页测试
+2. 打开 `抓取开关`
+3. 进入要抓的直播，等待抓取通知
+4. 关闭 `抓取开关`
+5. 打开 `替换开关`
+6. 再进入其他直播，看是否被替换
 
-当前替换逻辑：
+可选项：
+- `替换 FLV 地址` 留空时，默认使用最近一次抓到的目标地址
+- `替换 FLV 地址` 手动填写后，优先使用你填写的目标地址
 
-- 最优先改写第一跳 `302 Location`
-- 直接把抓到的 `IP FLV` 原文，写回第一跳 `pull-flv` 的 `302 Location`
-- 如果播放器继续请求原始 IP FLV，再由请求脚本做最后兜底重定向
+## 验证结论
 
-## 说明
-
-- 这套方案依赖 Loon 的 `http-response` / `http-request` 脚本能力以及插件参数能力
-- 文档依据：
-  - Loon 脚本类型文档
-  - Loon 插件文档
-  - Loon Script API 文档
+历史抓包回放的结论是：
+- 大多数命中的请求都能成功抓取并通知
+- 少数“不通知”的样本，根因是上游调度 JSON 自己返回了空 `complete_url`，这类请求本身没有可抓目标
+- 这种情况后面通常还会跟着同流的 `302` 或 `200 直连`，插件会在那些入口上继续抓取

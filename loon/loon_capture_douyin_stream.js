@@ -264,9 +264,9 @@ if (notifyCapture && finalResult.stored) {
     finalResult.mode === "redirect_302"
       ? "302 抓取成功"
       : finalResult.mode === "dispatch_json"
-        ? "Dispatch 抓取成功"
-        : "200 抓取成功";
-  $notification.post("Douyin Live Switch", label, finalResult.selected, {
+        ? "调度 JSON 抓取成功"
+        : "200 直连抓取成功";
+  $notification.post("抖音直播替换", label, finalResult.selected, {
     clipboard: finalResult.selected,
   });
 }

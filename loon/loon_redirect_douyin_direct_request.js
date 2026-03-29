@@ -66,7 +66,7 @@ if (selectedMode !== "direct_200" || !replacementUrl || !currentUrl || !isDirect
   delete headers.host;
   delete headers[":authority"];
 
-  $notification.post("Douyin Live Switch", "200 替换成功", replacementUrl, {
+  $notification.post("抖音直播替换", "200 直连替换成功", replacementUrl, {
     clipboard: replacementUrl,
   });
   $done({

@@ -131,7 +131,7 @@ if (!replacementUrl || !$response || !isJsonResponse() || (selectedMode !== "red
   if (!parsed || !rewriteDispatchNode(parsed, replacementUrl)) {
     $done({});
   } else {
-    $notification.post("Douyin Live Switch", "Dispatch 替换成功", replacementUrl, {
+    $notification.post("抖音直播替换", "调度 JSON 替换成功", replacementUrl, {
       clipboard: replacementUrl,
     });
     $done({

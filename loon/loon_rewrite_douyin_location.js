@@ -67,7 +67,7 @@ if ((selectedMode !== "redirect_302" && selectedMode !== "dispatch_json") || !$r
   } else {
     headers.Location = replacementUrl;
     headers.location = replacementUrl;
-    $notification.post("Douyin Live Switch", "302 替换成功", replacementUrl, {
+    $notification.post("抖音直播替换", "302 替换成功", replacementUrl, {
       clipboard: replacementUrl,
     });
     $done({

@@ -1,12 +1,10 @@
 "use strict";
 
+const CAPTURE_DEDUPE_MS = 15000;
+
 function getArgumentObject() {
-  if (typeof $argument === "object" && $argument !== null) {
-    return $argument;
-  }
-  if (typeof $argument !== "string" || !$argument.trim()) {
-    return {};
-  }
+  if (typeof $argument === "object" && $argument !== null) return $argument;
+  if (typeof $argument !== "string" || !$argument.trim()) return {};
   return $argument
     .split("&")
     .map((item) => item.split("="))
@@ -45,7 +43,6 @@ function isIpHost(hostname) {
 function isCapturedTargetUrl(urlValue) {
   const sanitized = sanitizeUrlCandidate(urlValue);
   if (!sanitized) return false;
-
   try {
     const url = new URL(sanitized);
     const lowerPath = url.pathname.toLowerCase();
@@ -71,10 +68,33 @@ function isCapturedTargetUrl(urlValue) {
   }
 }
 
+function fingerprintUrl(urlValue) {
+  const sanitized = sanitizeUrlCandidate(urlValue);
+  if (!sanitized) return "";
+  try {
+    const url = new URL(sanitized);
+    const uniqueId = url.searchParams.get("unique_id") || "";
+    const tId = url.searchParams.get("t_id") || "";
+    return [url.hostname, url.pathname, uniqueId, tId].join("|");
+  } catch {
+    return sanitized;
+  }
+}
+
 function storeCapturedUrl(urlValue) {
   const sanitized = sanitizeUrlCandidate(urlValue);
   if (!isCapturedTargetUrl(sanitized)) {
     return { stored: false, changed: false, selected: "" };
+  }
+
+  const now = Date.now();
+  const fingerprint = fingerprintUrl(sanitized);
+  const previousFingerprint = readPersistent(buildStorageKey("selected_fingerprint"), "");
+  const previousAt = Number(readPersistent(buildStorageKey("selected_at"), "0")) || 0;
+  const isDuplicate = fingerprint && fingerprint === previousFingerprint && now - previousAt < CAPTURE_DEDUPE_MS;
+
+  if (isDuplicate) {
+    return { stored: false, changed: false, selected: sanitized };
   }
 
   const previous = readPersistent(buildStorageKey("selected_location_url"), "");
@@ -82,7 +102,8 @@ function storeCapturedUrl(urlValue) {
 
   writePersistent(buildStorageKey("selected_location_url"), sanitized);
   writePersistent(buildStorageKey("selected_url"), sanitized);
-  writePersistent(buildStorageKey("selected_at"), Date.now());
+  writePersistent(buildStorageKey("selected_fingerprint"), fingerprint);
+  writePersistent(buildStorageKey("selected_at"), now);
 
   return { stored: true, changed, selected: sanitized };
 }
@@ -101,7 +122,7 @@ if ($response && $response.headers) {
 const result = storeCapturedUrl(candidate);
 
 if (notifyCapture && result.stored) {
-  $notification.post("Douyin Live Switch", result.changed ? "抓取成功" : "抓取到当前流", result.selected, {
+  $notification.post("Douyin Live Switch", result.changed ? "抓取成功" : "抓到当前流", result.selected, {
     clipboard: result.selected,
   });
 }

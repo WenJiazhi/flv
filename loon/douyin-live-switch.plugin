@@ -1,5 +1,5 @@
 #!name= Douyin Live Switch
-#!desc= Capture the first Douyin FLV redirect and replace live playback by rewriting the 302 location.
+#!desc= Capture and replace Douyin live streams by rewriting the first-hop FLV 302 location only.
 #!author= Codex
 #!homepage= https://nsloon.app/docs/Plugin/
 #!loon_version= 3.2.1(733)
@@ -7,13 +7,12 @@
 
 [Argument]
 override_url = input,"",tag=替换 FLV 地址,desc=可选。留空时使用最近抓到的第一跳 Location 地址；填写后强制替换成这里的地址。
-enable_capture = switch,true,tag=抓取开关,desc=只抓第一跳 302 Location 里的目标 FLV，并覆盖保存。
-enable_replace = switch,false,tag=替换开关,desc=打开后优先重写第一跳 302 Location；第二跳只在必要时才兜底改写。
+enable_capture = switch,true,tag=抓取开关,desc=只抓第一跳 302 Location 里的目标 FLV，并去重保存。
+enable_replace = switch,false,tag=替换开关,desc=打开后只改第一跳 302 Location，不再改第二跳请求。
 
 [Script]
 http-response ^https?:\/\/[^\/]*douyincdn\.com\/.*\.flv.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_capture_douyin_stream.js,requires-body=false,tag=抓取第一跳 FLV,argument=notify_capture=true,enable={enable_capture}
 http-response ^https?:\/\/[^\/]*douyincdn\.com\/.*\.flv.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_rewrite_douyin_location.js,requires-body=false,tag=替换 302 Location,argument=override_url={override_url},enable={enable_replace}
-http-request ^https?:\/\/\d{1,3}(?:\.\d{1,3}){3}(?::\d+)?\/.*\.flv.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_redirect_douyin_stream.js,tag=兜底重定向第二跳 FLV,argument=override_url={override_url},enable={enable_replace}
 
 [MITM]
 hostname = *.douyincdn.com

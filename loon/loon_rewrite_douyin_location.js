@@ -1,12 +1,8 @@
 "use strict";
 
 function getArgumentObject() {
-  if (typeof $argument === "object" && $argument !== null) {
-    return $argument;
-  }
-  if (typeof $argument !== "string" || !$argument.trim()) {
-    return {};
-  }
+  if (typeof $argument === "object" && $argument !== null) return $argument;
+  if (typeof $argument !== "string" || !$argument.trim()) return {};
   return $argument
     .split("&")
     .map((item) => item.split("="))

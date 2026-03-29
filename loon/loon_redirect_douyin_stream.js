@@ -60,7 +60,7 @@ function isIpFlvUrl(urlValue) {
     const lowerSearch = url.search.toLowerCase();
 
     return (
-      url.protocol === "http:" &&
+      (url.protocol === "http:" || url.protocol === "https:") &&
       isIpHost(url.hostname) &&
       lowerPath.endsWith(".flv") &&
       (
@@ -68,7 +68,8 @@ function isIpFlvUrl(urlValue) {
         lowerSearch.includes("douyincdn.com") ||
         lowerSearch.includes("domain=") ||
         lowerSearch.includes("vhost=") ||
-        lowerSearch.includes("fp_user_url=")
+        lowerSearch.includes("fp_user_url=") ||
+        lowerSearch.includes("redirect_to_ip=")
       )
     );
   } catch {

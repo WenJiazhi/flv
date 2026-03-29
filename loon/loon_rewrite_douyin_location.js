@@ -75,7 +75,11 @@ function shouldRewriteLocation(locationHeader) {
 
   try {
     const url = new URL(sanitized);
-    return url.protocol === "http:" && isIpHost(url.hostname) && url.pathname.toLowerCase().endsWith(".flv");
+    return (
+      (url.protocol === "http:" || url.protocol === "https:") &&
+      isIpHost(url.hostname) &&
+      url.pathname.toLowerCase().endsWith(".flv")
+    );
   } catch {
     return false;
   }

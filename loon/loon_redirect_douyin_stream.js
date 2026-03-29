@@ -31,7 +31,7 @@ function buildStorageKey(name) {
   return `douyin-live-switch:${name}`;
 }
 
-function normalizeUrlCandidate(value) {
+function sanitizeUrlCandidate(value) {
   if (typeof value !== "string") {
     return "";
   }
@@ -41,30 +41,21 @@ function normalizeUrlCandidate(value) {
     return "";
   }
 
-  try {
-    const url = new URL(trimmed);
-    const firstSegment = (url.pathname.match(/^\/([^/]+)/) || [])[1] || "";
-    if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(url.hostname) && /^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(firstSegment)) {
-      url.protocol = "https:";
-      url.hostname = firstSegment;
-      url.port = "";
-      url.pathname = url.pathname.replace(/^\/[^/]+/, "") || "/";
-    } else if (url.protocol === "http:" && !/^\d{1,3}(?:\.\d{1,3}){3}$/.test(url.hostname)) {
-      url.protocol = "https:";
-    }
-    return url.toString();
-  } catch {
-    return "";
-  }
+  return trimmed;
+}
+
+function isLocationStyleUrl(urlValue) {
+  const lower = String(urlValue || "").toLowerCase();
+  return /^http:\/\/\d{1,3}(?:\.\d{1,3}){3}\//.test(lower) && lower.includes("pull-flv");
 }
 
 function shouldKeepFlv(urlValue) {
-  const normalized = normalizeUrlCandidate(urlValue);
-  if (!normalized) {
+  const sanitized = sanitizeUrlCandidate(urlValue);
+  if (!sanitized) {
     return false;
   }
 
-  const lower = normalized.toLowerCase();
+  const lower = sanitized.toLowerCase();
   return (
     lower.includes(".flv?") ||
     lower.endsWith(".flv") ||
@@ -74,17 +65,21 @@ function shouldKeepFlv(urlValue) {
 }
 
 function getPreferredOverride(args) {
-  const explicit = normalizeUrlCandidate(args.override_url || "");
-  if (explicit) {
+  const explicit = sanitizeUrlCandidate(args.override_url || "");
+  if (isLocationStyleUrl(explicit)) {
     return explicit;
   }
 
   const useCaptured = String(args.use_captured || "").toLowerCase() !== "false";
   if (!useCaptured) {
-    return "";
+    return explicit;
   }
 
-  return normalizeUrlCandidate(readPersistent(buildStorageKey("best_url"), ""));
+  return (
+    sanitizeUrlCandidate(readPersistent(buildStorageKey("best_location_url"), "")) ||
+    explicit ||
+    sanitizeUrlCandidate(readPersistent(buildStorageKey("best_url"), ""))
+  );
 }
 
 const args = getArgumentObject();

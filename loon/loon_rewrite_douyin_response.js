@@ -27,10 +27,6 @@ function readPersistent(key, fallback) {
   return value == null || value === "" ? fallback : value;
 }
 
-function writePersistent(key, value) {
-  return $persistentStore.write(String(value), key);
-}
-
 function parseJson(text, fallback) {
   try {
     return JSON.parse(text);
@@ -43,7 +39,7 @@ function buildStorageKey(name) {
   return `douyin-live-switch:${name}`;
 }
 
-function normalizeUrlCandidate(value) {
+function sanitizeUrlCandidate(value) {
   if (typeof value !== "string") {
     return "";
   }
@@ -53,21 +49,7 @@ function normalizeUrlCandidate(value) {
     return "";
   }
 
-  try {
-    const url = new URL(trimmed);
-    const firstSegment = (url.pathname.match(/^\/([^/]+)/) || [])[1] || "";
-    if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(url.hostname) && /^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(firstSegment)) {
-      url.protocol = "https:";
-      url.hostname = firstSegment;
-      url.port = "";
-      url.pathname = url.pathname.replace(/^\/[^/]+/, "") || "/";
-    } else if (url.protocol === "http:" && !/^\d{1,3}(?:\.\d{1,3}){3}$/.test(url.hostname)) {
-      url.protocol = "https:";
-    }
-    return url.toString();
-  } catch {
-    return "";
-  }
+  return trimmed;
 }
 
 function extractUrlsFromText(value) {
@@ -76,16 +58,21 @@ function extractUrlsFromText(value) {
   }
 
   const matches = value.match(/https?:\/\/[^\s"'\\<>()]+/g) || [];
-  return matches.map((item) => normalizeUrlCandidate(item)).filter(Boolean);
+  return matches.map((item) => sanitizeUrlCandidate(item)).filter(Boolean);
+}
+
+function isLocationStyleUrl(urlValue) {
+  const lower = String(urlValue || "").toLowerCase();
+  return /^http:\/\/\d{1,3}(?:\.\d{1,3}){3}\//.test(lower) && lower.includes("pull-flv");
 }
 
 function shouldKeepFlv(urlValue, sourceKeyword) {
-  const normalized = normalizeUrlCandidate(urlValue);
-  if (!normalized) {
+  const sanitized = sanitizeUrlCandidate(urlValue);
+  if (!sanitized) {
     return false;
   }
 
-  const lower = normalized.toLowerCase();
+  const lower = sanitized.toLowerCase();
   const isFlv =
     lower.includes(".flv?") ||
     lower.endsWith(".flv") ||
@@ -106,6 +93,7 @@ function shouldKeepFlv(urlValue, sourceKeyword) {
 function scoreEntry(entry) {
   let score = Number(entry.hits || 0) * 10 + String(entry.url || "").length;
   const url = String(entry.url || "").toLowerCase();
+  if (isLocationStyleUrl(url)) score += 1500;
   if (url.includes("douyincdn.com")) score += 1000;
   if (url.includes(".flv")) score += 800;
   if (url.includes("pull-flv")) score += 400;
@@ -113,14 +101,14 @@ function scoreEntry(entry) {
 }
 
 function rememberFlv(urlValue, source, sourceKeyword) {
-  const normalized = normalizeUrlCandidate(urlValue);
-  if (!shouldKeepFlv(normalized, sourceKeyword)) {
+  const sanitized = sanitizeUrlCandidate(urlValue);
+  if (!shouldKeepFlv(sanitized, sourceKeyword)) {
     return null;
   }
 
   const entries = parseJson(readPersistent(buildStorageKey("captured_entries"), "[]"), []);
   const now = Date.now();
-  const existing = entries.find((item) => item.url === normalized);
+  const existing = entries.find((item) => item.url === sanitized);
 
   if (existing) {
     existing.hits = Number(existing.hits || 0) + 1;
@@ -140,23 +128,33 @@ function rememberFlv(urlValue, source, sourceKeyword) {
 
   entries.sort((left, right) => scoreEntry(right) - scoreEntry(left));
   const trimmed = entries.slice(0, 12);
-  writePersistent(buildStorageKey("captured_entries"), JSON.stringify(trimmed));
-  writePersistent(buildStorageKey("best_url"), trimmed[0] ? trimmed[0].url : "");
-  return normalized;
+  $persistentStore.write(JSON.stringify(trimmed), buildStorageKey("captured_entries"));
+  $persistentStore.write(trimmed[0] ? trimmed[0].url : "", buildStorageKey("best_url"));
+
+  if (isLocationStyleUrl(sanitized)) {
+    $persistentStore.write(sanitized, buildStorageKey("best_location_url"));
+  }
+
+  return sanitized;
 }
 
 function getPreferredOverride(args) {
-  const explicit = normalizeUrlCandidate(args.override_url || "");
-  if (explicit) {
+  const explicit = sanitizeUrlCandidate(args.override_url || "");
+  const useCaptured = String(args.use_captured || "").toLowerCase() !== "false";
+
+  if (isLocationStyleUrl(explicit)) {
     return explicit;
   }
 
-  const useCaptured = String(args.use_captured || "").toLowerCase() !== "false";
   if (!useCaptured) {
-    return "";
+    return explicit;
   }
 
-  return normalizeUrlCandidate(readPersistent(buildStorageKey("best_url"), ""));
+  return (
+    sanitizeUrlCandidate(readPersistent(buildStorageKey("best_location_url"), "")) ||
+    explicit ||
+    sanitizeUrlCandidate(readPersistent(buildStorageKey("best_url"), ""))
+  );
 }
 
 function replaceFlvUrlsInText(text, replacementUrl, sourceKeyword) {

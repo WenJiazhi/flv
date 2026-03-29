@@ -188,6 +188,7 @@ const notifyCapture = String(args.notify_capture || "true").toLowerCase() !== "f
 if (!captureEnabled) {
   setCaptureLock(false);
   $done({});
+  return;
 }
 
 let candidate = "";

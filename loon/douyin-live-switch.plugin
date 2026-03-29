@@ -7,20 +7,16 @@
 
 [Argument]
 override_url = input,"",tag=替换 FLV 地址,desc=填入要替换成的 FLV 直播流；支持 http://IP/域名/...，脚本会自动规范化。
-use_captured = switch,true,tag=优先使用已抓到的链接,desc=未填写替换地址时，自动使用最近抓到的最佳 FLV 链接。
-source_keyword = input,"douyincdn.com",tag=候选关键字,desc=抓取和替换时用于筛选的关键字。
-enable_capture = switch,true,tag=开启抓取,desc=抓取房间接口和 302 跳转中的 FLV 链接。
-enable_rewrite = switch,true,tag=开启响应重写,desc=重写房间接口返回体里的 FLV 链接。
-enable_redirect = switch,true,tag=开启请求重定向,desc=把播放器实际发出的 FLV 请求重定向到替换流。
-notify_capture = switch,false,tag=抓取时通知,desc=每次抓到新 FLV 链接时弹出通知。
+enable_capture = switch,true,tag=抓取开关,desc=抓取房间接口、302 跳转和实际 FLV 请求里的直播地址。
+enable_replace = switch,false,tag=替换开关,desc=打开后自动把直播流替换成“替换 FLV 地址”；如果留空，就自动用最近抓到的地址。
 
 [Script]
-http-response ^https?:\/\/(?:[^\/]+\.)?(?:live\.douyin\.com|webcast\d*[-\w]*\.amemv\.com|webcast\d*[-\w]*\.douyin\.com)\/.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_capture_douyin_stream.js,requires-body=true,tag=抓取抖音直播流,argument=[{source_keyword},{notify_capture}],enable={enable_capture}
-http-response ^https?:\/\/(?:[^\/]+\.)?(?:live\.douyin\.com|webcast\d*[-\w]*\.amemv\.com|webcast\d*[-\w]*\.douyin\.com)\/.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_rewrite_douyin_response.js,requires-body=true,tag=重写抖音直播配置,argument=[{override_url},{use_captured},{source_keyword}],enable={enable_rewrite}
-http-response ^https?:\/\/[^\/]*douyincdn\.com\/.*\.flv.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_capture_douyin_stream.js,requires-body=false,tag=抓取 CDN FLV,argument=[{source_keyword},{notify_capture}],enable={enable_capture}
-http-response ^http:\/\/\d{1,3}(?:\.\d{1,3}){3}\/[^?]*pull-flv[^?]*\.flv.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_capture_douyin_stream.js,requires-body=false,tag=抓取 IP FLV,argument=[{source_keyword},{notify_capture}],enable={enable_capture}
-http-request ^https?:\/\/[^\/]*douyincdn\.com\/.*\.flv.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_redirect_douyin_stream.js,tag=重定向 CDN FLV 请求,argument=[{override_url},{use_captured}],enable={enable_redirect}
-http-request ^http:\/\/\d{1,3}(?:\.\d{1,3}){3}\/[^?]*pull-flv[^?]*\.flv.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_redirect_douyin_stream.js,tag=重定向 IP FLV 请求,argument=[{override_url},{use_captured}],enable={enable_redirect}
+http-response ^https?:\/\/(?:[^\/]+\.)?(?:live\.douyin\.com|webcast\d*[-\w]*\.amemv\.com|webcast\d*[-\w]*\.douyin\.com)\/.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_capture_douyin_stream.js,requires-body=true,tag=抓取抖音直播流,argument=source_keyword=douyincdn.com&notify_capture=false,enable={enable_capture}
+http-response ^https?:\/\/(?:[^\/]+\.)?(?:live\.douyin\.com|webcast\d*[-\w]*\.amemv\.com|webcast\d*[-\w]*\.douyin\.com)\/.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_rewrite_douyin_response.js,requires-body=true,tag=重写抖音直播配置,argument=override_url={override_url}&use_captured=true&source_keyword=douyincdn.com,enable={enable_replace}
+http-response ^https?:\/\/[^\/]*douyincdn\.com\/.*\.flv.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_capture_douyin_stream.js,requires-body=false,tag=抓取 CDN FLV,argument=source_keyword=douyincdn.com&notify_capture=false,enable={enable_capture}
+http-response ^http:\/\/\d{1,3}(?:\.\d{1,3}){3}\/[^?]*pull-flv[^?]*\.flv.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_capture_douyin_stream.js,requires-body=false,tag=抓取 IP FLV,argument=source_keyword=douyincdn.com&notify_capture=false,enable={enable_capture}
+http-request ^https?:\/\/[^\/]*douyincdn\.com\/.*\.flv.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_redirect_douyin_stream.js,tag=重定向 CDN FLV 请求,argument=override_url={override_url}&use_captured=true,enable={enable_replace}
+http-request ^http:\/\/\d{1,3}(?:\.\d{1,3}){3}\/[^?]*pull-flv[^?]*\.flv.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_redirect_douyin_stream.js,tag=重定向 IP FLV 请求,argument=override_url={override_url}&use_captured=true,enable={enable_replace}
 
 [MITM]
 hostname = live.douyin.com, *.live.douyin.com, webcast.amemv.com, *.amemv.com, *.douyin.com

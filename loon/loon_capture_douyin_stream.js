@@ -43,7 +43,7 @@ function buildStorageKey(name) {
   return `douyin-live-switch:${name}`;
 }
 
-function normalizeUrlCandidate(value) {
+function sanitizeUrlCandidate(value) {
   if (typeof value !== "string") {
     return "";
   }
@@ -53,21 +53,7 @@ function normalizeUrlCandidate(value) {
     return "";
   }
 
-  try {
-    const url = new URL(trimmed);
-    const firstSegment = (url.pathname.match(/^\/([^/]+)/) || [])[1] || "";
-    if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(url.hostname) && /^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(firstSegment)) {
-      url.protocol = "https:";
-      url.hostname = firstSegment;
-      url.port = "";
-      url.pathname = url.pathname.replace(/^\/[^/]+/, "") || "/";
-    } else if (url.protocol === "http:" && !/^\d{1,3}(?:\.\d{1,3}){3}$/.test(url.hostname)) {
-      url.protocol = "https:";
-    }
-    return url.toString();
-  } catch {
-    return "";
-  }
+  return trimmed;
 }
 
 function extractUrlsFromText(value) {
@@ -76,23 +62,27 @@ function extractUrlsFromText(value) {
   }
 
   const matches = value.match(/https?:\/\/[^\s"'\\<>()]+/g) || [];
-  return matches.map((item) => normalizeUrlCandidate(item)).filter(Boolean);
+  return matches.map((item) => sanitizeUrlCandidate(item)).filter(Boolean);
 }
 
-function shouldKeepFlv(urlValue, sourceKeyword) {
-  const normalized = normalizeUrlCandidate(urlValue);
-  if (!normalized) {
-    return false;
-  }
-
-  const lower = normalized.toLowerCase();
-  const isFlv =
+function isFlvUrl(urlValue) {
+  const lower = String(urlValue || "").toLowerCase();
+  return (
     lower.includes(".flv?") ||
     lower.endsWith(".flv") ||
     lower.includes("/pull-flv") ||
-    lower.includes("pull-flv");
+    lower.includes("pull-flv")
+  );
+}
 
-  if (!isFlv) {
+function isLocationStyleUrl(urlValue) {
+  const lower = String(urlValue || "").toLowerCase();
+  return /^http:\/\/\d{1,3}(?:\.\d{1,3}){3}\//.test(lower) && lower.includes("pull-flv");
+}
+
+function shouldKeepFlv(urlValue, sourceKeyword) {
+  const sanitized = sanitizeUrlCandidate(urlValue);
+  if (!sanitized || !isFlvUrl(sanitized)) {
     return false;
   }
 
@@ -100,13 +90,16 @@ function shouldKeepFlv(urlValue, sourceKeyword) {
     return true;
   }
 
-  return lower.includes(String(sourceKeyword).toLowerCase());
+  return sanitized.toLowerCase().includes(String(sourceKeyword).toLowerCase());
 }
 
 function scoreEntry(entry) {
   let score = Number(entry.hits || 0) * 10 + String(entry.url || "").length;
   const url = String(entry.url || "").toLowerCase();
 
+  if (isLocationStyleUrl(url)) {
+    score += 1500;
+  }
   if (url.includes("douyincdn.com")) {
     score += 1000;
   }
@@ -121,15 +114,16 @@ function scoreEntry(entry) {
 }
 
 function rememberFlv(urlValue, source, sourceKeyword) {
-  const normalized = normalizeUrlCandidate(urlValue);
-  if (!shouldKeepFlv(normalized, sourceKeyword)) {
+  const sanitized = sanitizeUrlCandidate(urlValue);
+  if (!shouldKeepFlv(sanitized, sourceKeyword)) {
     return null;
   }
 
   const entries = parseJson(readPersistent(buildStorageKey("captured_entries"), "[]"), []);
   const previousBest = readPersistent(buildStorageKey("best_url"), "");
+  const previousLocation = readPersistent(buildStorageKey("best_location_url"), "");
   const now = Date.now();
-  const existing = entries.find((item) => item.url === normalized);
+  const existing = entries.find((item) => item.url === sanitized);
   let isNew = false;
 
   if (existing) {
@@ -142,7 +136,7 @@ function rememberFlv(urlValue, source, sourceKeyword) {
   } else {
     isNew = true;
     entries.push({
-      url: normalized,
+      url: sanitized,
       hits: 1,
       seenAt: now,
       sources: source ? [source] : [],
@@ -152,22 +146,31 @@ function rememberFlv(urlValue, source, sourceKeyword) {
   entries.sort((left, right) => scoreEntry(right) - scoreEntry(left));
   const trimmed = entries.slice(0, 12);
   writePersistent(buildStorageKey("captured_entries"), JSON.stringify(trimmed));
-  const nextBest = trimmed[0] ? trimmed[0].url : "";
-  writePersistent(buildStorageKey("best_url"), nextBest);
+
+  const bestUrl = trimmed[0] ? trimmed[0].url : "";
+  writePersistent(buildStorageKey("best_url"), bestUrl);
+
+  let bestLocationUrl = previousLocation;
+  if (isLocationStyleUrl(sanitized)) {
+    bestLocationUrl = sanitized;
+    writePersistent(buildStorageKey("best_location_url"), bestLocationUrl);
+  }
+
   return {
-    url: normalized,
+    url: sanitized,
     isNew,
-    becameBest: Boolean(nextBest) && nextBest !== previousBest && nextBest === normalized,
-    bestUrl: nextBest,
+    becameBest: Boolean(bestUrl) && bestUrl !== previousBest && bestUrl === sanitized,
+    becameBestLocation:
+      isLocationStyleUrl(sanitized) &&
+      Boolean(bestLocationUrl) &&
+      bestLocationUrl !== previousLocation,
+    bestUrl,
+    bestLocationUrl,
   };
 }
 
 function collectFlvCandidatesFromResponse(responseBody, sourceKeyword) {
   const candidates = [];
-
-  if ($request && $request.url) {
-    candidates.push({ url: $request.url, source: `request:${$request.url}` });
-  }
 
   if ($response && $response.headers) {
     const locationHeader = $response.headers.Location || $response.headers.location || "";
@@ -176,9 +179,15 @@ function collectFlvCandidatesFromResponse(responseBody, sourceKeyword) {
     }
   }
 
+  if ($request && $request.url && isLocationStyleUrl($request.url)) {
+    candidates.push({ url: $request.url, source: `request:${$request.url}` });
+  }
+
   if (typeof responseBody === "string" && responseBody) {
     for (const url of extractUrlsFromText(responseBody)) {
-      candidates.push({ url, source: `body:${$request.url}` });
+      if (isLocationStyleUrl(url)) {
+        candidates.push({ url, source: `body:${$request.url}` });
+      }
     }
   }
 
@@ -200,17 +209,15 @@ const body = $response && typeof $response.body === "string" ? $response.body : 
 const captured = collectFlvCandidatesFromResponse(body, sourceKeyword);
 
 if (captured.length && notifyCapture) {
-  const notable = captured.find((item) => item.isNew || item.becameBest) || null;
+  const notable = captured.find((item) => item.becameBestLocation || isLocationStyleUrl(item.url)) || null;
+
   if (notable) {
-    const best = notable.bestUrl || notable.url;
-    $notification.post(
-      "Douyin Live Switch",
-      notable.becameBest ? "已抓到新的最佳 FLV" : "已抓到新的 FLV",
-      best,
-      {
-        clipboard: best,
-      },
-    );
+    const text = notable.bestLocationUrl || notable.bestUrl || notable.url;
+    const title = "已抓到新的 IP FLV";
+
+    $notification.post("Douyin Live Switch", title, text, {
+      clipboard: text,
+    });
   }
 }
 

@@ -57,11 +57,16 @@ const currentUrl = sanitizeUrlCandidate($request && $request.url ? $request.url 
 if (selectedMode !== "direct_200" || !replacementUrl || !currentUrl || !isDirectCdnFlvUrl(currentUrl) || currentUrl === replacementUrl) {
   $done({});
 } else {
+  const headers = Object.assign({}, $request.headers || {});
+  delete headers.Host;
+  delete headers.host;
+  delete headers[":authority"];
+
   $notification.post("Douyin Live Switch", "200 替换成功", replacementUrl, {
     clipboard: replacementUrl,
   });
   $done({
     url: replacementUrl,
-    headers: Object.assign({}, $request.headers || {}),
+    headers,
   });
 }

@@ -49,7 +49,7 @@ const args = getArgumentObject();
 const replacementUrl = getReplacementUrl(args);
 const selectedMode = readPersistent(buildStorageKey("selected_mode"), "");
 
-if (selectedMode !== "redirect_302" || !$response || !$response.headers || !replacementUrl) {
+if ((selectedMode !== "redirect_302" && selectedMode !== "dispatch_json") || !$response || !$response.headers || !replacementUrl) {
   $done({});
 } else {
   const headers = Object.assign({}, $response.headers);

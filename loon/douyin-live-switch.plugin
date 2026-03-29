@@ -1,5 +1,5 @@
 #!name= Douyin Live Switch
-#!desc= Capture Douyin first-hop FLV as either 302 mode or 200 mode, and replace only the matching type.
+#!desc= Capture Douyin FLV targets from 302, dispatch JSON, or direct 200 responses, then replace with the matching stable path.
 #!author= Codex
 #!homepage= https://nsloon.app/docs/Plugin/
 #!loon_version= 3.2.1(733)
@@ -7,13 +7,15 @@
 
 [Argument]
 override_url = input,"",tag=替换 FLV 地址,desc=可选。留空时使用最近抓到的目标地址；填写后优先使用这里的地址。
-enable_capture = switch,true,tag=抓取开关,desc=抓取第一跳。302 就记 Location，200 video/x-flv 就记当前请求地址。
-enable_replace = switch,false,tag=替换开关,desc=302 只替换 302，200 只替换 200，不混用。
+enable_capture = switch,true,tag=抓取开关,desc=打开后只锁一条目标流。302 记 Location，dispatch JSON 记 complete_url，200 video/x-flv 记当前请求地址。
+enable_replace = switch,false,tag=替换开关,desc=打开后按抓到的类型稳定替换：302 和 dispatch 改响应，200 改同类直连请求。
 
 [Script]
-http-response ^https?:\/\/[^\/]*douyincdn\.com\/.*\.flv.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_capture_douyin_stream.js,requires-body=false,tag=抓取第一跳 FLV,argument=notify_capture=true,enable={enable_capture}
-http-response ^https?:\/\/[^\/]*douyincdn\.com\/.*\.flv.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_rewrite_douyin_location.js,requires-body=false,tag=302 模式替换,argument=override_url={override_url},enable={enable_replace}
-http-request ^https?:\/\/[^\/]*douyincdn\.com\/.*\.flv.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_redirect_douyin_direct_request.js,tag=200 模式替换,argument=override_url={override_url},enable={enable_replace}
+http-response ^https?:\/\/[^\/]*douyincdn\.com\/.*\.flv.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_capture_douyin_stream.js,requires-body=false,tag=抓取 FLV 入口,argument=notify_capture=true,enable={enable_capture}
+http-response ^https?:\/\/[^\/]*douyincdn\.com\/.*\.flv.*cdn_type=dispatch.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_capture_douyin_stream.js,requires-body=true,tag=抓取 Dispatch JSON,argument=notify_capture=true,enable={enable_capture}
+http-response ^https?:\/\/[^\/]*douyincdn\.com\/.*\.flv.*cdn_type=dispatch.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_rewrite_douyin_dispatch_json.js,requires-body=true,tag=Dispatch 替换,argument=override_url={override_url},enable={enable_replace}
+http-response ^https?:\/\/[^\/]*douyincdn\.com\/.*\.flv.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_rewrite_douyin_location.js,requires-body=false,tag=302 替换,argument=override_url={override_url},enable={enable_replace}
+http-request ^https?:\/\/[^\/]*douyincdn\.com\/.*\.flv.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_redirect_douyin_direct_request.js,tag=200 直连替换,argument=override_url={override_url},enable={enable_replace}
 
 [MITM]
 hostname = *.douyincdn.com

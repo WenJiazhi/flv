@@ -116,10 +116,13 @@ if (!candidate && $request && $request.url && isIpFlvUrl($request.url)) {
 }
 
 const lockedNow = lockCapturedUrl(candidate);
+const selectedUrl = readPersistent(buildStorageKey("selected_location_url"), "");
 
-if (lockedNow && notifyCapture) {
-  $notification.post("Douyin Live Switch", "抓取成功", candidate, {
-    clipboard: candidate,
+if (notifyCapture && candidate) {
+  const noticeText = selectedUrl || candidate;
+  const noticeTitle = lockedNow ? "抓取成功" : "已命中已锁定流";
+  $notification.post("Douyin Live Switch", noticeTitle, noticeText, {
+    clipboard: noticeText,
   });
 }
 

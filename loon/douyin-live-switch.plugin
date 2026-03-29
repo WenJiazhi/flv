@@ -13,6 +13,7 @@ enable_replace = switch,false,tag=替换开关,desc=打开后只改第一跳 302
 [Script]
 http-response ^https?:\/\/[^\/]*douyincdn\.com\/.*\.flv.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_capture_douyin_stream.js,requires-body=false,tag=抓取第一跳 FLV,argument=notify_capture=true,enable={enable_capture}
 http-response ^https?:\/\/[^\/]*douyincdn\.com\/.*\.flv.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_rewrite_douyin_location.js,requires-body=false,tag=替换 302 Location,argument=override_url={override_url},enable={enable_replace}
+http-request ^https?:\/\/[^\/]*douyincdn\.com\/.*\.flv.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_redirect_douyin_firsthop_request.js,tag=兜底重定向第一跳 FLV,argument=override_url={override_url},enable={enable_replace}
 
 [MITM]
 hostname = *.douyincdn.com

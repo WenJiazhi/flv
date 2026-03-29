@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FLV 直播播放器</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/flv.js@1.6.2/dist/flv.min.js"></script>
+    <script defer src="/app.js"></script>
+  </head>
+  <body>
+    <main class="shell">
+      <section class="panel form-panel">
+        <div class="hero">
+          <p class="eyebrow">FLV Proxy Player</p>
+          <h1>粘贴完整请求头，直接代理播放直播</h1>
+          <p class="subtitle">
+            浏览器本身不能稳定伪造完整请求头，这个页面会先把你的请求头交给本地 Node 服务，再由服务端按同样的
+            header 去拉取 FLV 直播流并转发给播放器。遇到浏览器不支持的 FLV 编码时，会自动切到
+            ffmpeg 转码兼容模式。
+          </p>
+        </div>
+
+        <form id="player-form">
+          <label class="field">
+            <span>播放地址（可选）</span>
+            <input
+              id="url"
+              name="url"
+              type="url"
+              placeholder="https://example.com/live/stream.flv"
+            />
+            <small>如果你粘贴的内容里已经包含请求行或 HTTP/2 伪头，这里可以留空。</small>
+          </label>
+
+          <label class="field">
+            <span>协议提示</span>
+            <select id="protocolHint" name="protocolHint">
+              <option value="https" selected>https</option>
+              <option value="http">http</option>
+            </select>
+            <small>当请求头里只有相对路径和 Host 时，用这个值补全最终播放地址。</small>
+          </label>
+
+          <label class="field">
+            <span>播放模式</span>
+            <select id="mode" name="mode">
+              <option value="auto" selected>自动：先直连，编码不兼容时转码</option>
+              <option value="direct">直连：只用原始 FLV 代理</option>
+              <option value="transcode">转码：直接用 ffmpeg 转成兼容编码</option>
+            </select>
+            <small>你这类 `Unsupported codec in video frame: 12`，建议保留“自动”或直接选“转码”。</small>
+          </label>
+
+          <label class="field">
+            <span>完整请求头</span>
+            <textarea
+              id="rawHeaders"
+              name="rawHeaders"
+              spellcheck="false"
+              placeholder="GET /live/test.flv?token=abc HTTP/1.1&#10;Host: example.com&#10;User-Agent: Mozilla/5.0&#10;Referer: https://example.com/player&#10;Cookie: session=xxx"
+            ></textarea>
+            <small>支持普通 HTTP 请求头、HTTP/2 伪头（`:authority` / `:path`）或只粘贴 header 再手动填写 URL。</small>
+          </label>
+
+          <div class="actions">
+            <button type="submit" id="playBtn">开始播放</button>
+            <button type="button" id="stopBtn" class="ghost">停止</button>
+            <button type="button" id="fillDemoBtn" class="ghost">填充示例</button>
+          </div>
+        </form>
+
+        <div class="info-grid">
+          <article class="info-card">
+            <h2>支持的输入</h2>
+            <p>Chrome DevTools 里复制出的请求头文本</p>
+            <p>完整请求首行 + Host + Cookie + Referer</p>
+            <p>HTTP/2 伪头风格：`:method` / `:scheme` / `:authority` / `:path`</p>
+          </article>
+          <article class="info-card">
+            <h2>兼容说明</h2>
+            <p>`flv.js` 只能直接播放浏览器支持的编码，常见是 H.264/AAC。</p>
+            <p>如果上游 FLV 里是 HEVC/增强 FLV，自动模式会切换到服务端转码。</p>
+            <p>转码会明显增加 CPU 占用，但能解决大多数“codec unsupported”问题。</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel player-panel">
+        <div class="player-frame">
+          <video id="video" controls muted autoplay playsinline></video>
+        </div>
+
+        <div class="status">
+          <p id="statusText">等待输入播放参数</p>
+          <code id="resolvedUrl">尚未创建播放会话</code>
+        </div>
+
+        <div class="log-panel">
+          <div class="log-header">
+            <h2>播放日志</h2>
+            <button type="button" id="clearLogBtn" class="ghost small">清空</button>
+          </div>
+          <pre id="log"></pre>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

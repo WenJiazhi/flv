@@ -1,0 +1,16 @@
+{
+  "name": "flv",
+  "version": "1.0.0",
+  "description": "Paste full request headers, proxy the FLV live stream, and play it in the browser.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^5.2.1"
+  }
+}

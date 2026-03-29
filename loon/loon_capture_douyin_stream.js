@@ -35,6 +35,8 @@ function buildStorageKey(name) {
   return `douyin-live-switch:${name}`;
 }
 
+const CAPTURE_SESSION_GAP_MS = 8000;
+
 function sanitizeUrlCandidate(value) {
   if (typeof value !== "string") {
     return "";
@@ -87,7 +89,14 @@ function lockCapturedUrl(urlValue) {
     return false;
   }
 
-  if (readPersistent(buildStorageKey("selected_location_url"), "")) {
+  const now = Date.now();
+  const lastEventAt = Number(readPersistent(buildStorageKey("capture_last_event_at"), "0")) || 0;
+  const sessionExpired = !lastEventAt || now - lastEventAt > CAPTURE_SESSION_GAP_MS;
+  const currentSelected = readPersistent(buildStorageKey("selected_location_url"), "");
+
+  writePersistent(buildStorageKey("capture_last_event_at"), now);
+
+  if (!sessionExpired && currentSelected) {
     return false;
   }
 
@@ -95,7 +104,7 @@ function lockCapturedUrl(urlValue) {
   writePersistent(buildStorageKey("selected_url"), sanitized);
   writePersistent(buildStorageKey("best_location_url"), sanitized);
   writePersistent(buildStorageKey("best_url"), sanitized);
-  writePersistent(buildStorageKey("selected_at"), Date.now());
+  writePersistent(buildStorageKey("selected_at"), now);
   return true;
 }
 

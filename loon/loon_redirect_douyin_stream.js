@@ -44,11 +44,6 @@ function sanitizeUrlCandidate(value) {
   return trimmed;
 }
 
-function isLocationStyleUrl(urlValue) {
-  const lower = String(urlValue || "").toLowerCase();
-  return /^http:\/\/\d{1,3}(?:\.\d{1,3}){3}\//.test(lower) && lower.includes("pull-flv");
-}
-
 function shouldKeepFlv(urlValue) {
   const sanitized = sanitizeUrlCandidate(urlValue);
   if (!sanitized) {
@@ -66,26 +61,25 @@ function shouldKeepFlv(urlValue) {
 
 function getPreferredOverride(args) {
   const explicit = sanitizeUrlCandidate(args.override_url || "");
-  if (isLocationStyleUrl(explicit)) {
+  if (explicit) {
     return explicit;
   }
 
   const useCaptured = String(args.use_captured || "").toLowerCase() !== "false";
   if (!useCaptured) {
-    return explicit;
+    return "";
   }
 
   return (
     sanitizeUrlCandidate(readPersistent(buildStorageKey("selected_location_url"), "")) ||
     sanitizeUrlCandidate(readPersistent(buildStorageKey("selected_url"), "")) ||
     sanitizeUrlCandidate(readPersistent(buildStorageKey("best_location_url"), "")) ||
-    explicit ||
     sanitizeUrlCandidate(readPersistent(buildStorageKey("best_url"), ""))
   );
 }
 
 function notifyReplacement(stage, replacementUrl) {
-  $notification.post("Douyin Live Switch", `替换成功: ${stage}`, replacementUrl, {
+  $notification.post("Douyin Live Switch", `Replacement applied: ${stage}`, replacementUrl, {
     clipboard: replacementUrl,
   });
 }
@@ -105,7 +99,7 @@ if (!replacementUrl || !shouldKeepFlv($request.url)) {
     // Ignore parsing failures.
   }
 
-  notifyReplacement("请求重定向", replacementUrl);
+  notifyReplacement("request redirect", replacementUrl);
   $done({
     url: replacementUrl,
     headers,

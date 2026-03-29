@@ -140,21 +140,19 @@ function rememberFlv(urlValue, source, sourceKeyword) {
 
 function getPreferredOverride(args) {
   const explicit = sanitizeUrlCandidate(args.override_url || "");
-  const useCaptured = String(args.use_captured || "").toLowerCase() !== "false";
-
-  if (isLocationStyleUrl(explicit)) {
+  if (explicit) {
     return explicit;
   }
 
+  const useCaptured = String(args.use_captured || "").toLowerCase() !== "false";
   if (!useCaptured) {
-    return explicit;
+    return "";
   }
 
   return (
     sanitizeUrlCandidate(readPersistent(buildStorageKey("selected_location_url"), "")) ||
     sanitizeUrlCandidate(readPersistent(buildStorageKey("selected_url"), "")) ||
     sanitizeUrlCandidate(readPersistent(buildStorageKey("best_location_url"), "")) ||
-    explicit ||
     sanitizeUrlCandidate(readPersistent(buildStorageKey("best_url"), ""))
   );
 }
@@ -173,7 +171,7 @@ function replaceFlvUrlsInText(text, replacementUrl, sourceKeyword) {
 }
 
 function notifyReplacement(stage, replacementUrl) {
-  $notification.post("Douyin Live Switch", `替换成功: ${stage}`, replacementUrl, {
+  $notification.post("Douyin Live Switch", `Replacement applied: ${stage}`, replacementUrl, {
     clipboard: replacementUrl,
   });
 }
@@ -199,7 +197,7 @@ if (!$response || typeof $response.body !== "string" || !$response.body) {
       const headers = Object.assign({}, $response.headers || {});
       delete headers["Content-Length"];
       delete headers["content-length"];
-      notifyReplacement("房间配置", replacementUrl);
+      notifyReplacement("room config", replacementUrl);
       $done({
         status: $response.status,
         headers,

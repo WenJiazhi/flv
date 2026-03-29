@@ -51,26 +51,30 @@ function isLocationStyleUrl(urlValue) {
 
 function getPreferredOverride(args) {
   const explicit = sanitizeUrlCandidate(args.override_url || "");
-  if (isLocationStyleUrl(explicit)) {
+  if (explicit) {
     return explicit;
   }
 
   const useCaptured = String(args.use_captured || "").toLowerCase() !== "false";
   if (!useCaptured) {
-    return explicit;
+    return "";
   }
 
   return (
     sanitizeUrlCandidate(readPersistent(buildStorageKey("selected_location_url"), "")) ||
     sanitizeUrlCandidate(readPersistent(buildStorageKey("selected_url"), "")) ||
     sanitizeUrlCandidate(readPersistent(buildStorageKey("best_location_url"), "")) ||
-    explicit ||
     sanitizeUrlCandidate(readPersistent(buildStorageKey("best_url"), ""))
   );
 }
 
+function shouldRewriteLocation(locationHeader) {
+  const lower = String(locationHeader || "").toLowerCase();
+  return lower.includes(".flv") || lower.includes("pull-flv");
+}
+
 function notifyReplacement(stage, replacementUrl) {
-  $notification.post("Douyin Live Switch", `替换成功: ${stage}`, replacementUrl, {
+  $notification.post("Douyin Live Switch", `Replacement applied: ${stage}`, replacementUrl, {
     clipboard: replacementUrl,
   });
 }
@@ -84,12 +88,12 @@ if (!$response || !$response.headers || !replacementUrl) {
   const headers = Object.assign({}, $response.headers);
   const locationHeader = headers.Location || headers.location || "";
 
-  if (!locationHeader || !String(locationHeader).toLowerCase().includes(".flv")) {
+  if (!shouldRewriteLocation(locationHeader)) {
     $done({});
   } else {
     headers.Location = replacementUrl;
     headers.location = replacementUrl;
-    notifyReplacement("302 Location", replacementUrl);
+    notifyReplacement("302 location", replacementUrl);
     $done({
       status: $response.status,
       headers,

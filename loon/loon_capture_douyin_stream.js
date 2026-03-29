@@ -191,6 +191,10 @@ function rememberFlv(urlValue, source, sourceKeyword) {
 }
 
 function collectFlvCandidatesFromResponse(responseBody, sourceKeyword) {
+  if (readPersistent(buildStorageKey("selected_location_url"), "")) {
+    return [];
+  }
+
   const candidates = [];
 
   if ($response && $response.headers) {
@@ -234,7 +238,7 @@ if (captured.length && notifyCapture) {
 
   if (notable) {
     const text = notable.selectedLocationUrl || notable.url;
-    $notification.post("Douyin Live Switch", "已锁定替换直播流", text, {
+    $notification.post("Douyin Live Switch", "Captured first live stream", text, {
       clipboard: text,
     });
   }

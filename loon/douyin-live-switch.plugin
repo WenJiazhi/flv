@@ -7,8 +7,8 @@
 
 [Argument]
 override_url = input,"",tag=替换 FLV 地址,desc=可选。留空时使用最近抓到的目标地址；填写后优先使用这里的地址。
-enable_capture = switch,true,tag=抓取开关,desc=打开后只锁一条目标流。302 记 Location，dispatch JSON 记 complete_url，200 video/x-flv 记当前请求地址。
-enable_replace = switch,false,tag=替换开关,desc=打开后按抓到的类型稳定替换：302 和 dispatch 改响应，200 改同类直连请求。
+enable_capture = switch,true,tag=抓取开关,desc=打开后只锁一条目标流。同一条流里，302 或 dispatch 会覆盖较弱的 200 直连识别。
+enable_replace = switch,false,tag=替换开关,desc=打开后按抓到的类型替换：302 改 Location，dispatch 改 JSON，200 改直连请求。
 
 [Script]
 http-response ^https?:\/\/[^\/]*(?:douyincdn\.com|douyinliving\.com)\/.*\.flv.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_capture_douyin_stream.js,requires-body=false,tag=抓取 FLV 入口,argument=notify_capture=true&capture_enabled={enable_capture}

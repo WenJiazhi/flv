@@ -50,13 +50,15 @@ function isRedirectTargetFlvUrl(urlValue) {
         lowerPath.includes("/third/") ||
         lowerPath.includes("/stage/") ||
         lowerPath.includes("/thirdgame/") ||
+        lowerPath.includes("/fantasy/") ||
         lowerSearch.includes("douyincdn.com") ||
         lowerSearch.includes("douyinliving.com") ||
         lowerSearch.includes("domain=") ||
         lowerSearch.includes("vhost=") ||
         lowerSearch.includes("fp_user_url=") ||
         lowerSearch.includes("redirect_to_ip=") ||
-        lowerSearch.includes("302_dispatch=")
+        lowerSearch.includes("302_dispatch=") ||
+        lowerSearch.includes("ks302=")
       )
     );
   } catch {
@@ -98,7 +100,7 @@ function rewriteDispatchNode(node, replacementUrl) {
       node.port = target.port || (target.protocol === "https:" ? "443" : "80");
       node.redirect = true;
     } catch {
-      // ignore
+      // ignore malformed replacement url here
     }
     changed = true;
   }

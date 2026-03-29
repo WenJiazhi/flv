@@ -44,7 +44,11 @@ function shouldRewriteLocation(locationHeader) {
   const lower = sanitized.toLowerCase();
   return (
     lower.includes(".flv") &&
-    (lower.includes("douyincdn.com") || lower.includes("douyinliving.com") || /^http:\/\/\d{1,3}(?:\.\d{1,3}){3}\//.test(lower))
+    (
+      lower.includes("douyincdn.com") ||
+      lower.includes("douyinliving.com") ||
+      /^http:\/\/\d{1,3}(?:\.\d{1,3}){3}\//.test(lower)
+    )
   );
 }
 
@@ -57,6 +61,7 @@ if ((selectedMode !== "redirect_302" && selectedMode !== "dispatch_json") || !$r
 } else {
   const headers = Object.assign({}, $response.headers);
   const locationHeader = headers.Location || headers.location || "";
+
   if (!shouldRewriteLocation(locationHeader) || sanitizeUrlCandidate(locationHeader) === replacementUrl) {
     $done({});
   } else {

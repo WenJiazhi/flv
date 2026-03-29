@@ -40,7 +40,18 @@ function isIpHost(hostname) {
   return /^\d{1,3}(?:\.\d{1,3}){3}$/.test(String(hostname || ""));
 }
 
-function isCapturedTargetUrl(urlValue) {
+function isDirectCdnFlvUrl(urlValue) {
+  const sanitized = sanitizeUrlCandidate(urlValue);
+  if (!sanitized) return false;
+  try {
+    const url = new URL(sanitized);
+    return url.hostname.toLowerCase().includes("douyincdn.com") && url.pathname.toLowerCase().endsWith(".flv");
+  } catch {
+    return false;
+  }
+}
+
+function isRedirectTargetFlvUrl(urlValue) {
   const sanitized = sanitizeUrlCandidate(urlValue);
   if (!sanitized) return false;
   try {
@@ -68,6 +79,10 @@ function isCapturedTargetUrl(urlValue) {
   }
 }
 
+function isStorableCaptureUrl(urlValue) {
+  return isRedirectTargetFlvUrl(urlValue) || isDirectCdnFlvUrl(urlValue);
+}
+
 function fingerprintUrl(urlValue) {
   const sanitized = sanitizeUrlCandidate(urlValue);
   if (!sanitized) return "";
@@ -82,7 +97,7 @@ function fingerprintUrl(urlValue) {
 
 function storeCapturedUrl(urlValue) {
   const sanitized = sanitizeUrlCandidate(urlValue);
-  if (!isCapturedTargetUrl(sanitized)) {
+  if (!isStorableCaptureUrl(sanitized)) {
     return { stored: false, changed: false, selected: "" };
   }
 
@@ -107,15 +122,31 @@ function storeCapturedUrl(urlValue) {
   return { stored: true, changed, selected: sanitized };
 }
 
+function isVideoFlvResponse() {
+  if (!$response || !$response.headers) return false;
+  const contentType = String($response.headers["Content-Type"] || $response.headers["content-type"] || "").toLowerCase();
+  return contentType.includes("video/x-flv");
+}
+
+function isHttp200Response() {
+  if (!$response || !$response.status) return false;
+  return String($response.status).startsWith("200");
+}
+
 const args = getArgumentObject();
 const notifyCapture = String(args.notify_capture || "true").toLowerCase() !== "false";
 
 let candidate = "";
+
 if ($response && $response.headers) {
   const locationHeader = sanitizeUrlCandidate($response.headers.Location || $response.headers.location || "");
-  if (isCapturedTargetUrl(locationHeader)) {
+  if (isRedirectTargetFlvUrl(locationHeader)) {
     candidate = locationHeader;
   }
+}
+
+if (!candidate && isHttp200Response() && isVideoFlvResponse() && $request && isDirectCdnFlvUrl($request.url || "")) {
+  candidate = sanitizeUrlCandidate($request.url);
 }
 
 const result = storeCapturedUrl(candidate);

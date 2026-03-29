@@ -6,6 +6,7 @@ const MODE_PRIORITY = {
   dispatch_json: 2,
   redirect_302: 3,
 };
+const CAPTURE_LOCK_KEY = "capture_lock";
 
 function getArgumentObject() {
   if (typeof $argument === "object" && $argument !== null) return $argument;
@@ -101,6 +102,14 @@ function getModePriority(mode) {
   return MODE_PRIORITY[mode] || 0;
 }
 
+function getCaptureLock() {
+  return readPersistent(buildStorageKey(CAPTURE_LOCK_KEY), "");
+}
+
+function setCaptureLock(value) {
+  return writePersistent(buildStorageKey(CAPTURE_LOCK_KEY), value ? "1" : "0");
+}
+
 function storeCapturedUrl(urlValue, mode) {
   const sanitized = sanitizeUrlCandidate(urlValue);
   if (!sanitized || !mode) {
@@ -179,7 +188,13 @@ function extractDispatchCompleteUrl(node) {
 }
 
 const args = getArgumentObject();
+const captureEnabled = String(args.capture_enabled || "true").toLowerCase() === "true";
 const notifyCapture = String(args.notify_capture || "true").toLowerCase() !== "false";
+
+if (!captureEnabled) {
+  setCaptureLock(false);
+  $done({});
+}
 
 let candidate = "";
 let mode = "";
@@ -205,7 +220,26 @@ if (!candidate && isHttp200Response() && isVideoFlvResponse() && $request && isD
   mode = "direct_200";
 }
 
-const result = storeCapturedUrl(candidate, mode);
+const lockActive = getCaptureLock() === "1";
+const candidateFingerprint = fingerprintUrl(candidate);
+const selectedFingerprint = readPersistent(buildStorageKey("selected_fingerprint"), "");
+const selectedMode = readPersistent(buildStorageKey("selected_mode"), "");
+const selectedAt = Number(readPersistent(buildStorageKey("selected_at"), "0")) || 0;
+const allowUpgradeSameFlow =
+  lockActive &&
+  candidateFingerprint &&
+  candidateFingerprint === selectedFingerprint &&
+  Date.now() - selectedAt < CAPTURE_DEDUPE_MS &&
+  getModePriority(mode) > getModePriority(selectedMode);
+
+let result = { stored: false, changed: false, selected: "", mode: "" };
+
+if (!lockActive || allowUpgradeSameFlow) {
+  result = storeCapturedUrl(candidate, mode);
+  if (result.stored) {
+    setCaptureLock(true);
+  }
+}
 
 if (notifyCapture && result.stored) {
   const label =

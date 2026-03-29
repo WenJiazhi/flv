@@ -4,19 +4,15 @@ function getArgumentObject() {
   if (typeof $argument === "object" && $argument !== null) {
     return $argument;
   }
-
   if (typeof $argument !== "string" || !$argument.trim()) {
     return {};
   }
-
   return $argument
     .split("&")
     .map((item) => item.split("="))
     .reduce((result, pair) => {
       const key = decodeURIComponent(pair[0] || "").trim();
-      if (!key) {
-        return result;
-      }
+      if (!key) return result;
       result[key] = decodeURIComponent(pair.slice(1).join("=") || "").trim();
       return result;
     }, {});
@@ -36,15 +32,9 @@ function buildStorageKey(name) {
 }
 
 function sanitizeUrlCandidate(value) {
-  if (typeof value !== "string") {
-    return "";
-  }
-
+  if (typeof value !== "string") return "";
   const trimmed = value.trim();
-  if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) {
-    return "";
-  }
-
+  if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) return "";
   return trimmed;
 }
 
@@ -52,23 +42,23 @@ function isIpHost(hostname) {
   return /^\d{1,3}(?:\.\d{1,3}){3}$/.test(String(hostname || ""));
 }
 
-function isIpFlvUrl(urlValue) {
+function isCapturedTargetUrl(urlValue) {
   const sanitized = sanitizeUrlCandidate(urlValue);
-  if (!sanitized) {
-    return false;
-  }
+  if (!sanitized) return false;
 
   try {
     const url = new URL(sanitized);
     const lowerPath = url.pathname.toLowerCase();
     const lowerSearch = url.search.toLowerCase();
-
     return (
       (url.protocol === "http:" || url.protocol === "https:") &&
       isIpHost(url.hostname) &&
       lowerPath.endsWith(".flv") &&
       (
         lowerPath.includes("pull-flv") ||
+        lowerPath.includes("/third/") ||
+        lowerPath.includes("/stage/") ||
+        lowerPath.includes("/thirdgame/") ||
         lowerSearch.includes("douyincdn.com") ||
         lowerSearch.includes("domain=") ||
         lowerSearch.includes("vhost=") ||
@@ -83,7 +73,7 @@ function isIpFlvUrl(urlValue) {
 
 function storeCapturedUrl(urlValue) {
   const sanitized = sanitizeUrlCandidate(urlValue);
-  if (!isIpFlvUrl(sanitized)) {
+  if (!isCapturedTargetUrl(sanitized)) {
     return { stored: false, changed: false, selected: "" };
   }
 
@@ -92,8 +82,6 @@ function storeCapturedUrl(urlValue) {
 
   writePersistent(buildStorageKey("selected_location_url"), sanitized);
   writePersistent(buildStorageKey("selected_url"), sanitized);
-  writePersistent(buildStorageKey("best_location_url"), sanitized);
-  writePersistent(buildStorageKey("best_url"), sanitized);
   writePersistent(buildStorageKey("selected_at"), Date.now());
 
   return { stored: true, changed, selected: sanitized };
@@ -103,16 +91,11 @@ const args = getArgumentObject();
 const notifyCapture = String(args.notify_capture || "true").toLowerCase() !== "false";
 
 let candidate = "";
-
 if ($response && $response.headers) {
   const locationHeader = sanitizeUrlCandidate($response.headers.Location || $response.headers.location || "");
-  if (isIpFlvUrl(locationHeader)) {
+  if (isCapturedTargetUrl(locationHeader)) {
     candidate = locationHeader;
   }
-}
-
-if (!candidate && $request && $request.url && isIpFlvUrl($request.url)) {
-  candidate = sanitizeUrlCandidate($request.url);
 }
 
 const result = storeCapturedUrl(candidate);

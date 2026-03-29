@@ -4,19 +4,15 @@ function getArgumentObject() {
   if (typeof $argument === "object" && $argument !== null) {
     return $argument;
   }
-
   if (typeof $argument !== "string" || !$argument.trim()) {
     return {};
   }
-
   return $argument
     .split("&")
     .map((item) => item.split("="))
     .reduce((result, pair) => {
       const key = decodeURIComponent(pair[0] || "").trim();
-      if (!key) {
-        return result;
-      }
+      if (!key) return result;
       result[key] = decodeURIComponent(pair.slice(1).join("=") || "").trim();
       return result;
     }, {});
@@ -32,15 +28,9 @@ function buildStorageKey(name) {
 }
 
 function sanitizeUrlCandidate(value) {
-  if (typeof value !== "string") {
-    return "";
-  }
-
+  if (typeof value !== "string") return "";
   const trimmed = value.trim();
-  if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) {
-    return "";
-  }
-
+  if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) return "";
   return trimmed;
 }
 
@@ -48,53 +38,30 @@ function isIpHost(hostname) {
   return /^\d{1,3}(?:\.\d{1,3}){3}$/.test(String(hostname || ""));
 }
 
-function isIpFlvUrl(urlValue) {
+function isSecondHopUrl(urlValue) {
   const sanitized = sanitizeUrlCandidate(urlValue);
-  if (!sanitized) {
-    return false;
-  }
-
+  if (!sanitized) return false;
   try {
     const url = new URL(sanitized);
-    const lowerPath = url.pathname.toLowerCase();
-    const lowerSearch = url.search.toLowerCase();
-
-    return (
-      (url.protocol === "http:" || url.protocol === "https:") &&
-      isIpHost(url.hostname) &&
-      lowerPath.endsWith(".flv") &&
-      (
-        lowerPath.includes("pull-flv") ||
-        lowerSearch.includes("douyincdn.com") ||
-        lowerSearch.includes("domain=") ||
-        lowerSearch.includes("vhost=") ||
-        lowerSearch.includes("fp_user_url=") ||
-        lowerSearch.includes("redirect_to_ip=")
-      )
-    );
+    return (url.protocol === "http:" || url.protocol === "https:") && isIpHost(url.hostname) && url.pathname.toLowerCase().endsWith(".flv");
   } catch {
     return false;
   }
 }
 
 function getReplacementUrl(args) {
-  const explicit = sanitizeUrlCandidate(args.override_url || "");
-  if (explicit) {
-    return explicit;
-  }
-
   return (
+    sanitizeUrlCandidate(args.override_url || "") ||
     sanitizeUrlCandidate(readPersistent(buildStorageKey("selected_location_url"), "")) ||
-    sanitizeUrlCandidate(readPersistent(buildStorageKey("selected_url"), "")) ||
-    sanitizeUrlCandidate(readPersistent(buildStorageKey("best_location_url"), "")) ||
-    sanitizeUrlCandidate(readPersistent(buildStorageKey("best_url"), ""))
+    sanitizeUrlCandidate(readPersistent(buildStorageKey("selected_url"), ""))
   );
 }
 
 const args = getArgumentObject();
 const replacementUrl = getReplacementUrl(args);
+const currentUrl = sanitizeUrlCandidate($request && $request.url ? $request.url : "");
 
-if (!replacementUrl || !$request || !isIpFlvUrl($request.url)) {
+if (!replacementUrl || !currentUrl || !isSecondHopUrl(currentUrl) || currentUrl === replacementUrl) {
   $done({});
 } else {
   const headers = Object.assign({}, $request.headers || {});
@@ -106,7 +73,7 @@ if (!replacementUrl || !$request || !isIpFlvUrl($request.url)) {
     // Ignore parsing failures.
   }
 
-  $notification.post("Douyin Live Switch", "第二跳替换成功", replacementUrl, {
+  $notification.post("Douyin Live Switch", "第二跳兜底替换", replacementUrl, {
     clipboard: replacementUrl,
   });
   $done({

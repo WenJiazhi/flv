@@ -35,8 +35,6 @@ function buildStorageKey(name) {
   return `douyin-live-switch:${name}`;
 }
 
-const CAPTURE_SESSION_GAP_MS = 8000;
-
 function sanitizeUrlCandidate(value) {
   if (typeof value !== "string") {
     return "";
@@ -83,29 +81,22 @@ function isIpFlvUrl(urlValue) {
   }
 }
 
-function lockCapturedUrl(urlValue) {
+function storeCapturedUrl(urlValue) {
   const sanitized = sanitizeUrlCandidate(urlValue);
   if (!isIpFlvUrl(sanitized)) {
-    return false;
+    return { stored: false, changed: false, selected: "" };
   }
 
-  const now = Date.now();
-  const lastEventAt = Number(readPersistent(buildStorageKey("capture_last_event_at"), "0")) || 0;
-  const sessionExpired = !lastEventAt || now - lastEventAt > CAPTURE_SESSION_GAP_MS;
-  const currentSelected = readPersistent(buildStorageKey("selected_location_url"), "");
-
-  writePersistent(buildStorageKey("capture_last_event_at"), now);
-
-  if (!sessionExpired && currentSelected) {
-    return false;
-  }
+  const previous = readPersistent(buildStorageKey("selected_location_url"), "");
+  const changed = previous !== sanitized;
 
   writePersistent(buildStorageKey("selected_location_url"), sanitized);
   writePersistent(buildStorageKey("selected_url"), sanitized);
   writePersistent(buildStorageKey("best_location_url"), sanitized);
   writePersistent(buildStorageKey("best_url"), sanitized);
-  writePersistent(buildStorageKey("selected_at"), now);
-  return true;
+  writePersistent(buildStorageKey("selected_at"), Date.now());
+
+  return { stored: true, changed, selected: sanitized };
 }
 
 const args = getArgumentObject();
@@ -124,14 +115,11 @@ if (!candidate && $request && $request.url && isIpFlvUrl($request.url)) {
   candidate = sanitizeUrlCandidate($request.url);
 }
 
-const lockedNow = lockCapturedUrl(candidate);
-const selectedUrl = readPersistent(buildStorageKey("selected_location_url"), "");
+const result = storeCapturedUrl(candidate);
 
-if (notifyCapture && candidate) {
-  const noticeText = selectedUrl || candidate;
-  const noticeTitle = lockedNow ? "抓取成功" : "已命中已锁定流";
-  $notification.post("Douyin Live Switch", noticeTitle, noticeText, {
-    clipboard: noticeText,
+if (notifyCapture && result.stored) {
+  $notification.post("Douyin Live Switch", result.changed ? "抓取成功" : "抓取到当前流", result.selected, {
+    clipboard: result.selected,
   });
 }
 

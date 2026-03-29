@@ -1,6 +1,6 @@
 "use strict";
 
-const CAPTURE_DEDUPE_MS = 15000;
+const CAPTURE_DEDUPE_MS = 3000;
 
 function getArgumentObject() {
   if (typeof $argument === "object" && $argument !== null) return $argument;
@@ -74,8 +74,7 @@ function fingerprintUrl(urlValue) {
   try {
     const url = new URL(sanitized);
     const uniqueId = url.searchParams.get("unique_id") || "";
-    const tId = url.searchParams.get("t_id") || "";
-    return [url.hostname, url.pathname, uniqueId, tId].join("|");
+    return [url.hostname, url.pathname, uniqueId].join("|");
   } catch {
     return sanitized;
   }

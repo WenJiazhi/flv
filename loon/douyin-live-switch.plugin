@@ -13,8 +13,8 @@ enable_replace = switch,false,tag=替换开关,desc=打开后把所有命中的�
 [Script]
 http-response ^https?:\/\/[^\/]*douyincdn\.com\/.*\.flv.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_capture_douyin_stream.js,requires-body=false,tag=抓取第一跳 FLV,argument=source_keyword=douyincdn.com&notify_capture=true,enable={enable_capture}
 http-response ^https?:\/\/[^\/]*douyincdn\.com\/.*\.flv.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_rewrite_douyin_location.js,requires-body=false,tag=替换 302 Location,argument=override_url={override_url}&use_captured=true,enable={enable_replace}
-http-response ^http:\/\/\d{1,3}(?:\.\d{1,3}){3}\/[^?]*pull-flv[^?]*\.flv.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_capture_douyin_stream.js,requires-body=false,tag=抓取第二跳 FLV,argument=source_keyword=douyincdn.com&notify_capture=true,enable={enable_capture}
-http-request ^http:\/\/\d{1,3}(?:\.\d{1,3}){3}\/[^?]*pull-flv[^?]*\.flv.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_redirect_douyin_stream.js,tag=重定向第二跳 FLV,argument=override_url={override_url}&use_captured=true,enable={enable_replace}
+http-response ^http:\/\/\d{1,3}(?:\.\d{1,3}){3}\/.*\.flv.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_capture_douyin_stream.js,requires-body=false,tag=抓取第二跳 FLV,argument=source_keyword=douyincdn.com&notify_capture=true,enable={enable_capture}
+http-request ^http:\/\/\d{1,3}(?:\.\d{1,3}){3}\/.*\.flv.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_redirect_douyin_stream.js,tag=重定向第二跳 FLV,argument=override_url={override_url}&use_captured=true,enable={enable_replace}
 
 [MITM]
 hostname = *.douyincdn.com

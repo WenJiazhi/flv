@@ -44,9 +44,36 @@ function sanitizeUrlCandidate(value) {
   return trimmed;
 }
 
+function isIpHost(hostname) {
+  return /^\d{1,3}(?:\.\d{1,3}){3}$/.test(String(hostname || ""));
+}
+
 function isIpFlvUrl(urlValue) {
-  const lower = String(urlValue || "").toLowerCase();
-  return /^http:\/\/\d{1,3}(?:\.\d{1,3}){3}\//.test(lower) && lower.includes("pull-flv") && lower.includes(".flv");
+  const sanitized = sanitizeUrlCandidate(urlValue);
+  if (!sanitized) {
+    return false;
+  }
+
+  try {
+    const url = new URL(sanitized);
+    const lowerPath = url.pathname.toLowerCase();
+    const lowerSearch = url.search.toLowerCase();
+
+    return (
+      url.protocol === "http:" &&
+      isIpHost(url.hostname) &&
+      lowerPath.endsWith(".flv") &&
+      (
+        lowerPath.includes("pull-flv") ||
+        lowerSearch.includes("douyincdn.com") ||
+        lowerSearch.includes("domain=") ||
+        lowerSearch.includes("vhost=") ||
+        lowerSearch.includes("fp_user_url=")
+      )
+    );
+  } catch {
+    return false;
+  }
 }
 
 function getReplacementUrl(args) {

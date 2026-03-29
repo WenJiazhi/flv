@@ -44,6 +44,10 @@ function sanitizeUrlCandidate(value) {
   return trimmed;
 }
 
+function isIpHost(hostname) {
+  return /^\d{1,3}(?:\.\d{1,3}){3}$/.test(String(hostname || ""));
+}
+
 function getReplacementUrl(args) {
   const explicit = sanitizeUrlCandidate(args.override_url || "");
   if (explicit) {
@@ -59,8 +63,22 @@ function getReplacementUrl(args) {
 }
 
 function shouldRewriteLocation(locationHeader) {
-  const lower = String(locationHeader || "").toLowerCase();
-  return lower.includes(".flv") && (lower.includes("pull-flv") || lower.includes("douyincdn.com"));
+  const sanitized = sanitizeUrlCandidate(locationHeader);
+  if (!sanitized) {
+    return false;
+  }
+
+  const lower = sanitized.toLowerCase();
+  if (lower.includes(".flv") && lower.includes("douyincdn.com")) {
+    return true;
+  }
+
+  try {
+    const url = new URL(sanitized);
+    return url.protocol === "http:" && isIpHost(url.hostname) && url.pathname.toLowerCase().endsWith(".flv");
+  } catch {
+    return false;
+  }
 }
 
 const args = getArgumentObject();

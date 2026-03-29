@@ -75,7 +75,7 @@ function runCaptureScript({ request, response, argument = "capture_enabled=true&
       read(key) {
         return Object.prototype.hasOwnProperty.call(persistentState, key) ? persistentState[key] : null;
       },
-      write(key, value) {
+      write(value, key) {
         persistentState[key] = String(value);
         return true;
       },

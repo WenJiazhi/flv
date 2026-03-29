@@ -102,7 +102,7 @@ function getCaptureLock() {
 }
 
 function setCaptureLock(value) {
-  return writePersistent(value ? "1" : "0", buildStorageKey(CAPTURE_LOCK_KEY));
+  return writePersistent(buildStorageKey(CAPTURE_LOCK_KEY), value ? "1" : "0");
 }
 
 function getCaptureSwitchState() {
@@ -110,7 +110,7 @@ function getCaptureSwitchState() {
 }
 
 function setCaptureSwitchState(value) {
-  return writePersistent(value ? "1" : "0", buildStorageKey(CAPTURE_SWITCH_STATE_KEY));
+  return writePersistent(buildStorageKey(CAPTURE_SWITCH_STATE_KEY), value ? "1" : "0");
 }
 
 function getFlowFingerprint(urlValue) {
@@ -181,11 +181,11 @@ function storeCapturedUrl(urlValue, mode) {
     return { stored: false, selected: "", mode: "" };
   }
 
-  writePersistent(sanitized, buildStorageKey("selected_location_url"));
-  writePersistent(sanitized, buildStorageKey("selected_url"));
-  writePersistent(mode, buildStorageKey("selected_mode"));
-  writePersistent(getFlowFingerprint(sanitized), buildStorageKey("selected_fingerprint"));
-  writePersistent(String(Date.now()), buildStorageKey("selected_at"));
+  writePersistent(buildStorageKey("selected_location_url"), sanitized);
+  writePersistent(buildStorageKey("selected_url"), sanitized);
+  writePersistent(buildStorageKey("selected_mode"), mode);
+  writePersistent(buildStorageKey("selected_fingerprint"), getFlowFingerprint(sanitized));
+  writePersistent(buildStorageKey("selected_at"), String(Date.now()));
 
   return { stored: true, selected: sanitized, mode };
 }

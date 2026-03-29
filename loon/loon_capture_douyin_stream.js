@@ -6,7 +6,6 @@ const MODE_PRIORITY = {
   dispatch_json: 2,
   redirect_302: 3,
 };
-const CAPTURE_LOCK_KEY = "capture_lock";
 
 function getArgumentObject() {
   if (typeof $argument === "object" && $argument !== null) return $argument;
@@ -86,57 +85,25 @@ function isRedirectTargetFlvUrl(urlValue) {
   }
 }
 
-function fingerprintUrl(urlValue) {
-  const sanitized = sanitizeUrlCandidate(urlValue);
-  if (!sanitized) return "";
-  try {
-    const url = new URL(sanitized);
-    const uniqueId = url.searchParams.get("unique_id") || "";
-    return [url.hostname, url.pathname, uniqueId].join("|");
-  } catch {
-    return sanitized;
-  }
-}
-
 function getModePriority(mode) {
   return MODE_PRIORITY[mode] || 0;
 }
 
-function getCaptureLock() {
-  return readPersistent(buildStorageKey(CAPTURE_LOCK_KEY), "");
-}
-
-function setCaptureLock(value) {
-  return writePersistent(buildStorageKey(CAPTURE_LOCK_KEY), value ? "1" : "0");
-}
-
-function storeCapturedUrl(urlValue, mode) {
+function getFlowFingerprint(urlValue) {
   const sanitized = sanitizeUrlCandidate(urlValue);
-  if (!sanitized || !mode) {
-    return { stored: false, changed: false, selected: "", mode: "" };
+  if (!sanitized) return "";
+
+  try {
+    const url = new URL(sanitized);
+    const uniqueId = url.searchParams.get("unique_id") || "";
+    if (uniqueId) return uniqueId;
+
+    const parts = url.pathname.split("/").filter(Boolean);
+    if (!parts.length) return sanitized;
+    return parts[parts.length - 1].toLowerCase();
+  } catch {
+    return sanitized;
   }
-
-  const now = Date.now();
-  const fingerprint = fingerprintUrl(sanitized);
-  const previousFingerprint = readPersistent(buildStorageKey("selected_fingerprint"), "");
-  const previousAt = Number(readPersistent(buildStorageKey("selected_at"), "0")) || 0;
-  const previousMode = readPersistent(buildStorageKey("selected_mode"), "");
-  const withinWindow = fingerprint && fingerprint === previousFingerprint && now - previousAt < CAPTURE_DEDUPE_MS;
-
-  if (withinWindow && getModePriority(mode) <= getModePriority(previousMode)) {
-    return { stored: false, changed: false, selected: sanitized, mode };
-  }
-
-  const previous = readPersistent(buildStorageKey("selected_location_url"), "");
-  const changed = previous !== sanitized || previousMode !== mode;
-
-  writePersistent(buildStorageKey("selected_location_url"), sanitized);
-  writePersistent(buildStorageKey("selected_url"), sanitized);
-  writePersistent(buildStorageKey("selected_mode"), mode);
-  writePersistent(buildStorageKey("selected_fingerprint"), fingerprint);
-  writePersistent(buildStorageKey("selected_at"), now);
-
-  return { stored: true, changed, selected: sanitized, mode };
 }
 
 function isVideoFlvResponse() {
@@ -187,12 +154,40 @@ function extractDispatchCompleteUrl(node) {
   return "";
 }
 
+function storeCapturedUrl(urlValue, mode) {
+  const sanitized = sanitizeUrlCandidate(urlValue);
+  if (!sanitized || !mode) {
+    return { stored: false, changed: false, selected: "", mode: "" };
+  }
+
+  const now = Date.now();
+  const fingerprint = getFlowFingerprint(sanitized);
+  const previousFingerprint = readPersistent(buildStorageKey("selected_fingerprint"), "");
+  const previousAt = Number(readPersistent(buildStorageKey("selected_at"), "0")) || 0;
+  const previousMode = readPersistent(buildStorageKey("selected_mode"), "");
+  const sameRecentFlow = fingerprint && fingerprint === previousFingerprint && now - previousAt < CAPTURE_DEDUPE_MS;
+
+  if (sameRecentFlow && getModePriority(mode) <= getModePriority(previousMode)) {
+    return { stored: false, changed: false, selected: sanitized, mode: previousMode };
+  }
+
+  const previous = readPersistent(buildStorageKey("selected_location_url"), "");
+  const changed = previous !== sanitized || previousMode !== mode;
+
+  writePersistent(buildStorageKey("selected_location_url"), sanitized);
+  writePersistent(buildStorageKey("selected_url"), sanitized);
+  writePersistent(buildStorageKey("selected_mode"), mode);
+  writePersistent(buildStorageKey("selected_fingerprint"), fingerprint);
+  writePersistent(buildStorageKey("selected_at"), now);
+
+  return { stored: true, changed, selected: sanitized, mode };
+}
+
 const args = getArgumentObject();
 const captureEnabled = String(args.capture_enabled || "true").toLowerCase() === "true";
 const notifyCapture = String(args.notify_capture || "true").toLowerCase() !== "false";
 
 if (!captureEnabled) {
-  setCaptureLock(false);
   $done({});
 }
 
@@ -220,26 +215,7 @@ if (!candidate && isHttp200Response() && isVideoFlvResponse() && $request && isD
   mode = "direct_200";
 }
 
-const lockActive = getCaptureLock() === "1";
-const candidateFingerprint = fingerprintUrl(candidate);
-const selectedFingerprint = readPersistent(buildStorageKey("selected_fingerprint"), "");
-const selectedMode = readPersistent(buildStorageKey("selected_mode"), "");
-const selectedAt = Number(readPersistent(buildStorageKey("selected_at"), "0")) || 0;
-const allowUpgradeSameFlow =
-  lockActive &&
-  candidateFingerprint &&
-  candidateFingerprint === selectedFingerprint &&
-  Date.now() - selectedAt < CAPTURE_DEDUPE_MS &&
-  getModePriority(mode) > getModePriority(selectedMode);
-
-let result = { stored: false, changed: false, selected: "", mode: "" };
-
-if (!lockActive || allowUpgradeSameFlow) {
-  result = storeCapturedUrl(candidate, mode);
-  if (result.stored) {
-    setCaptureLock(true);
-  }
-}
+const result = storeCapturedUrl(candidate, mode);
 
 if (notifyCapture && result.stored) {
   const label =

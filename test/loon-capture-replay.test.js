@@ -8,6 +8,8 @@ const vm = require("node:vm");
 
 const SCRIPT_PATH = path.join(__dirname, "..", "loon", "loon_capture_douyin_stream.js");
 const SCRIPT_SOURCE = fs.readFileSync(SCRIPT_PATH, "utf8");
+const TOGGLE_SCRIPT_PATH = path.join(__dirname, "..", "loon", "loon_capture_toggle_sync.js");
+const TOGGLE_SCRIPT_SOURCE = fs.readFileSync(TOGGLE_SCRIPT_PATH, "utf8");
 
 function parseRawHeaders(text) {
   const lines = text.split(/\r?\n/).filter(Boolean);
@@ -102,6 +104,34 @@ function runCaptureScript({ request, response, argument = "capture_enabled=true&
   };
 }
 
+function runToggleScript({ argument = "capture_enabled=true", store = {} }) {
+  const persistentState = { ...store };
+  let donePayload = null;
+
+  const sandbox = {
+    $argument: argument,
+    $persistentStore: {
+      read(key) {
+        return Object.prototype.hasOwnProperty.call(persistentState, key) ? persistentState[key] : null;
+      },
+      write(value, key) {
+        persistentState[key] = String(value);
+        return true;
+      },
+    },
+    $done(payload) {
+      donePayload = payload || {};
+    },
+  };
+
+  vm.runInNewContext(`(() => {\n${TOGGLE_SCRIPT_SOURCE}\n})();`, sandbox, { filename: TOGGLE_SCRIPT_PATH });
+
+  return {
+    donePayload,
+    store: persistentState,
+  };
+}
+
 test("capture script recognizes douyinliving 302 redirect targets from real dumps", () => {
   const caseDir = path.join(__dirname, "..", "tmp_loon_dump8", "10440_11081_1774772982081");
   const result = runCaptureScript({
@@ -167,39 +197,15 @@ test("capture script clears lock and exits immediately when capture is disabled"
     argument: "capture_enabled=false&notify_capture=false",
     store: {
       "douyin-live-switch:capture_lock": "1",
+      "douyin-live-switch:capture_enabled_state": "1",
       "douyin-live-switch:selected_url": "http://old.example/stream.flv",
     },
   });
 
   assert.equal(result.store["douyin-live-switch:capture_lock"], "0");
+  assert.equal(result.store["douyin-live-switch:capture_enabled_state"], "0");
   assert.equal(result.store["douyin-live-switch:selected_url"], "http://old.example/stream.flv");
   assert.deepEqual(result.notifications, []);
-});
-
-test("capture script allows a new flow after the old lock expires", () => {
-  const result = runCaptureScript({
-    request: {
-      method: "GET",
-      url: "http://pull-flv-l1.douyincdn.com/third/stream-new.flv?unique_id=stream-new",
-      headers: { Host: "pull-flv-l1.douyincdn.com" },
-    },
-    response: {
-      status: "302 Found",
-      headers: { Location: "http://2.2.2.2/third/stream-new.flv?unique_id=stream-new" },
-      body: "",
-    },
-    now: 10_000,
-    store: {
-      "douyin-live-switch:capture_lock": "1",
-      "douyin-live-switch:selected_mode": "redirect_302",
-      "douyin-live-switch:selected_fingerprint": "stream-old",
-      "douyin-live-switch:selected_at": "1000",
-      "douyin-live-switch:selected_url": "http://1.1.1.1/third/stream-old.flv?unique_id=stream-old",
-    },
-  });
-
-  assert.equal(result.store["douyin-live-switch:selected_fingerprint"], "stream-new");
-  assert.equal(result.store["douyin-live-switch:selected_url"], "http://2.2.2.2/third/stream-new.flv?unique_id=stream-new");
 });
 
 test("capture script still upgrades the same flow from direct 200 to redirect 302", () => {
@@ -217,6 +223,7 @@ test("capture script still upgrades the same flow from direct 200 to redirect 30
     now: 2_000,
     store: {
       "douyin-live-switch:capture_lock": "1",
+      "douyin-live-switch:capture_enabled_state": "1",
       "douyin-live-switch:selected_mode": "direct_200",
       "douyin-live-switch:selected_fingerprint": "stream-upgrade",
       "douyin-live-switch:selected_at": "1500",
@@ -229,4 +236,54 @@ test("capture script still upgrades the same flow from direct 200 to redirect 30
     result.store["douyin-live-switch:selected_url"],
     "http://3.3.3.3/third/stream-upgrade.flv?unique_id=stream-upgrade",
   );
+});
+
+test("toggle sync resets the lock when capture is turned off and arms a fresh capture when turned on again", () => {
+  const afterDisable = runToggleScript({
+    argument: "capture_enabled=false",
+    store: {
+      "douyin-live-switch:capture_lock": "1",
+      "douyin-live-switch:capture_enabled_state": "1",
+      "douyin-live-switch:selected_url": "http://old.example/stream.flv",
+    },
+  });
+
+  assert.equal(afterDisable.store["douyin-live-switch:capture_lock"], "0");
+  assert.equal(afterDisable.store["douyin-live-switch:capture_enabled_state"], "0");
+  assert.equal(afterDisable.store["douyin-live-switch:selected_url"], "http://old.example/stream.flv");
+
+  const afterEnable = runToggleScript({
+    argument: "capture_enabled=true",
+    store: afterDisable.store,
+  });
+
+  assert.equal(afterEnable.store["douyin-live-switch:capture_lock"], "0");
+  assert.equal(afterEnable.store["douyin-live-switch:capture_enabled_state"], "1");
+});
+
+test("capture script does not replace a locked flow with another new flow while capture stays enabled", () => {
+  const result = runCaptureScript({
+    request: {
+      method: "GET",
+      url: "http://pull-flv-l1.douyincdn.com/third/stream-new.flv?unique_id=stream-new",
+      headers: { Host: "pull-flv-l1.douyincdn.com" },
+    },
+    response: {
+      status: "302 Found",
+      headers: { Location: "http://2.2.2.2/third/stream-new.flv?unique_id=stream-new" },
+      body: "",
+    },
+    now: 10_000,
+    store: {
+      "douyin-live-switch:capture_lock": "1",
+      "douyin-live-switch:capture_enabled_state": "1",
+      "douyin-live-switch:selected_mode": "redirect_302",
+      "douyin-live-switch:selected_fingerprint": "stream-old",
+      "douyin-live-switch:selected_at": "1000",
+      "douyin-live-switch:selected_url": "http://1.1.1.1/third/stream-old.flv?unique_id=stream-old",
+    },
+  });
+
+  assert.equal(result.store["douyin-live-switch:selected_fingerprint"], "stream-old");
+  assert.equal(result.store["douyin-live-switch:selected_url"], "http://1.1.1.1/third/stream-old.flv?unique_id=stream-old");
 });

@@ -79,10 +79,6 @@ function isRedirectTargetFlvUrl(urlValue) {
   }
 }
 
-function isStorableCaptureUrl(urlValue) {
-  return isRedirectTargetFlvUrl(urlValue) || isDirectCdnFlvUrl(urlValue);
-}
-
 function fingerprintUrl(urlValue) {
   const sanitized = sanitizeUrlCandidate(urlValue);
   if (!sanitized) return "";
@@ -95,31 +91,33 @@ function fingerprintUrl(urlValue) {
   }
 }
 
-function storeCapturedUrl(urlValue) {
+function storeCapturedUrl(urlValue, mode) {
   const sanitized = sanitizeUrlCandidate(urlValue);
-  if (!isStorableCaptureUrl(sanitized)) {
-    return { stored: false, changed: false, selected: "" };
+  if (!sanitized || !mode) {
+    return { stored: false, changed: false, selected: "", mode: "" };
   }
 
   const now = Date.now();
-  const fingerprint = fingerprintUrl(sanitized);
+  const fingerprint = `${mode}|${fingerprintUrl(sanitized)}`;
   const previousFingerprint = readPersistent(buildStorageKey("selected_fingerprint"), "");
   const previousAt = Number(readPersistent(buildStorageKey("selected_at"), "0")) || 0;
   const isDuplicate = fingerprint && fingerprint === previousFingerprint && now - previousAt < CAPTURE_DEDUPE_MS;
 
   if (isDuplicate) {
-    return { stored: false, changed: false, selected: sanitized };
+    return { stored: false, changed: false, selected: sanitized, mode };
   }
 
   const previous = readPersistent(buildStorageKey("selected_location_url"), "");
-  const changed = previous !== sanitized;
+  const previousMode = readPersistent(buildStorageKey("selected_mode"), "");
+  const changed = previous !== sanitized || previousMode !== mode;
 
   writePersistent(buildStorageKey("selected_location_url"), sanitized);
   writePersistent(buildStorageKey("selected_url"), sanitized);
+  writePersistent(buildStorageKey("selected_mode"), mode);
   writePersistent(buildStorageKey("selected_fingerprint"), fingerprint);
   writePersistent(buildStorageKey("selected_at"), now);
 
-  return { stored: true, changed, selected: sanitized };
+  return { stored: true, changed, selected: sanitized, mode };
 }
 
 function isVideoFlvResponse() {
@@ -129,30 +127,33 @@ function isVideoFlvResponse() {
 }
 
 function isHttp200Response() {
-  if (!$response || !$response.status) return false;
-  return String($response.status).startsWith("200");
+  return Boolean($response && String($response.status || "").startsWith("200"));
 }
 
 const args = getArgumentObject();
 const notifyCapture = String(args.notify_capture || "true").toLowerCase() !== "false";
 
 let candidate = "";
+let mode = "";
 
 if ($response && $response.headers) {
   const locationHeader = sanitizeUrlCandidate($response.headers.Location || $response.headers.location || "");
   if (isRedirectTargetFlvUrl(locationHeader)) {
     candidate = locationHeader;
+    mode = "redirect_302";
   }
 }
 
 if (!candidate && isHttp200Response() && isVideoFlvResponse() && $request && isDirectCdnFlvUrl($request.url || "")) {
   candidate = sanitizeUrlCandidate($request.url);
+  mode = "direct_200";
 }
 
-const result = storeCapturedUrl(candidate);
+const result = storeCapturedUrl(candidate, mode);
 
 if (notifyCapture && result.stored) {
-  $notification.post("Douyin Live Switch", result.changed ? "抓取成功" : "抓到当前流", result.selected, {
+  const label = result.mode === "redirect_302" ? "302 抓取成功" : "200 抓取成功";
+  $notification.post("Douyin Live Switch", label, result.selected, {
     clipboard: result.selected,
   });
 }

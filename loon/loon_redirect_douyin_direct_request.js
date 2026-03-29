@@ -30,6 +30,17 @@ function sanitizeUrlCandidate(value) {
   return trimmed;
 }
 
+function isDirectCdnFlvUrl(urlValue) {
+  const sanitized = sanitizeUrlCandidate(urlValue);
+  if (!sanitized) return false;
+  try {
+    const url = new URL(sanitized);
+    return url.hostname.toLowerCase().includes("douyincdn.com") && url.pathname.toLowerCase().endsWith(".flv");
+  } catch {
+    return false;
+  }
+}
+
 function getReplacementUrl(args) {
   return (
     sanitizeUrlCandidate(args.override_url || "") ||
@@ -38,33 +49,19 @@ function getReplacementUrl(args) {
   );
 }
 
-function shouldRewriteLocation(locationHeader) {
-  const sanitized = sanitizeUrlCandidate(locationHeader);
-  if (!sanitized) return false;
-  const lower = sanitized.toLowerCase();
-  return lower.includes(".flv") && (lower.includes("douyincdn.com") || /^http:\/\/\d{1,3}(?:\.\d{1,3}){3}\//.test(lower));
-}
-
 const args = getArgumentObject();
 const replacementUrl = getReplacementUrl(args);
 const selectedMode = readPersistent(buildStorageKey("selected_mode"), "");
+const currentUrl = sanitizeUrlCandidate($request && $request.url ? $request.url : "");
 
-if (selectedMode !== "redirect_302" || !$response || !$response.headers || !replacementUrl) {
+if (selectedMode !== "direct_200" || !replacementUrl || !currentUrl || !isDirectCdnFlvUrl(currentUrl) || currentUrl === replacementUrl) {
   $done({});
 } else {
-  const headers = Object.assign({}, $response.headers);
-  const locationHeader = headers.Location || headers.location || "";
-  if (!shouldRewriteLocation(locationHeader) || sanitizeUrlCandidate(locationHeader) === replacementUrl) {
-    $done({});
-  } else {
-    headers.Location = replacementUrl;
-    headers.location = replacementUrl;
-    $notification.post("Douyin Live Switch", "302 替换成功", replacementUrl, {
-      clipboard: replacementUrl,
-    });
-    $done({
-      status: $response.status,
-      headers,
-    });
-  }
+  $notification.post("Douyin Live Switch", "200 替换成功", replacementUrl, {
+    clipboard: replacementUrl,
+  });
+  $done({
+    url: replacementUrl,
+    headers: Object.assign({}, $request.headers || {}),
+  });
 }

@@ -44,30 +44,15 @@ function sanitizeUrlCandidate(value) {
   return trimmed;
 }
 
-function shouldKeepFlv(urlValue) {
-  const sanitized = sanitizeUrlCandidate(urlValue);
-  if (!sanitized) {
-    return false;
-  }
-
-  const lower = sanitized.toLowerCase();
-  return (
-    lower.includes(".flv?") ||
-    lower.endsWith(".flv") ||
-    lower.includes("/pull-flv") ||
-    lower.includes("pull-flv")
-  );
+function isIpFlvUrl(urlValue) {
+  const lower = String(urlValue || "").toLowerCase();
+  return /^http:\/\/\d{1,3}(?:\.\d{1,3}){3}\//.test(lower) && lower.includes("pull-flv") && lower.includes(".flv");
 }
 
-function getPreferredOverride(args) {
+function getReplacementUrl(args) {
   const explicit = sanitizeUrlCandidate(args.override_url || "");
   if (explicit) {
     return explicit;
-  }
-
-  const useCaptured = String(args.use_captured || "").toLowerCase() !== "false";
-  if (!useCaptured) {
-    return "";
   }
 
   return (
@@ -78,16 +63,10 @@ function getPreferredOverride(args) {
   );
 }
 
-function notifyReplacement(stage, replacementUrl) {
-  $notification.post("Douyin Live Switch", `Replacement applied: ${stage}`, replacementUrl, {
-    clipboard: replacementUrl,
-  });
-}
-
 const args = getArgumentObject();
-const replacementUrl = getPreferredOverride(args);
+const replacementUrl = getReplacementUrl(args);
 
-if (!replacementUrl || !shouldKeepFlv($request.url)) {
+if (!replacementUrl || !$request || !isIpFlvUrl($request.url)) {
   $done({});
 } else {
   const headers = Object.assign({}, $request.headers || {});
@@ -99,7 +78,9 @@ if (!replacementUrl || !shouldKeepFlv($request.url)) {
     // Ignore parsing failures.
   }
 
-  notifyReplacement("request redirect", replacementUrl);
+  $notification.post("Douyin Live Switch", "第二跳替换成功", replacementUrl, {
+    clipboard: replacementUrl,
+  });
   $done({
     url: replacementUrl,
     headers,

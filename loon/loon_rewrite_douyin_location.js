@@ -44,20 +44,10 @@ function sanitizeUrlCandidate(value) {
   return trimmed;
 }
 
-function isLocationStyleUrl(urlValue) {
-  const lower = String(urlValue || "").toLowerCase();
-  return /^http:\/\/\d{1,3}(?:\.\d{1,3}){3}\//.test(lower) && lower.includes("pull-flv");
-}
-
-function getPreferredOverride(args) {
+function getReplacementUrl(args) {
   const explicit = sanitizeUrlCandidate(args.override_url || "");
   if (explicit) {
     return explicit;
-  }
-
-  const useCaptured = String(args.use_captured || "").toLowerCase() !== "false";
-  if (!useCaptured) {
-    return "";
   }
 
   return (
@@ -70,17 +60,11 @@ function getPreferredOverride(args) {
 
 function shouldRewriteLocation(locationHeader) {
   const lower = String(locationHeader || "").toLowerCase();
-  return lower.includes(".flv") || lower.includes("pull-flv");
-}
-
-function notifyReplacement(stage, replacementUrl) {
-  $notification.post("Douyin Live Switch", `Replacement applied: ${stage}`, replacementUrl, {
-    clipboard: replacementUrl,
-  });
+  return lower.includes(".flv") && (lower.includes("pull-flv") || lower.includes("douyincdn.com"));
 }
 
 const args = getArgumentObject();
-const replacementUrl = getPreferredOverride(args);
+const replacementUrl = getReplacementUrl(args);
 
 if (!$response || !$response.headers || !replacementUrl) {
   $done({});
@@ -93,7 +77,9 @@ if (!$response || !$response.headers || !replacementUrl) {
   } else {
     headers.Location = replacementUrl;
     headers.location = replacementUrl;
-    notifyReplacement("302 location", replacementUrl);
+    $notification.post("Douyin Live Switch", "302 替换成功", replacementUrl, {
+      clipboard: replacementUrl,
+    });
     $done({
       status: $response.status,
       headers,

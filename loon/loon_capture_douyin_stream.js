@@ -31,6 +31,16 @@ function writePersistent(key, value) {
   return $persistentStore.write(String(value), key);
 }
 
+function readBooleanArgument(args, keys, fallback) {
+  for (const key of keys) {
+    if (!Object.prototype.hasOwnProperty.call(args, key)) continue;
+    const normalized = String(args[key] == null ? "" : args[key]).trim().toLowerCase();
+    if (!normalized || /^\{.+\}$/.test(normalized)) continue;
+    return normalized === "true";
+  }
+  return fallback;
+}
+
 function buildStorageKey(name) {
   return `douyin-live-switch:${name}`;
 }
@@ -191,8 +201,8 @@ function storeCapturedUrl(urlValue, mode) {
 }
 
 const args = getArgumentObject();
-const captureEnabled = String(args.capture_enabled || "true").toLowerCase() === "true";
-const notifyCapture = String(args.notify_capture || "true").toLowerCase() !== "false";
+const captureEnabled = readBooleanArgument(args, ["capture_enabled", "enable_capture"], true);
+const notifyCapture = readBooleanArgument(args, ["notify_capture"], true);
 
 if (!captureEnabled) {
   setCaptureLock(false);

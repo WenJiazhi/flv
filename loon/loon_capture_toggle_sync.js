@@ -23,12 +23,22 @@ function readPersistent(key, fallback) {
   return value == null || value === "" ? fallback : value;
 }
 
+function readBooleanArgument(args, keys, fallback) {
+  for (const key of keys) {
+    if (!Object.prototype.hasOwnProperty.call(args, key)) continue;
+    const normalized = String(args[key] == null ? "" : args[key]).trim().toLowerCase();
+    if (!normalized || /^\{.+\}$/.test(normalized)) continue;
+    return normalized === "true";
+  }
+  return fallback;
+}
+
 function buildStorageKey(name) {
   return `douyin-live-switch:${name}`;
 }
 
 const args = getArgumentObject();
-const captureEnabled = String(args.capture_enabled || "true").toLowerCase() === "true";
+const captureEnabled = readBooleanArgument(args, ["capture_enabled", "enable_capture"], true);
 const switchStateKey = buildStorageKey("capture_enabled_state");
 const lockKey = buildStorageKey("capture_lock");
 const previousState = readPersistent(switchStateKey, "0");

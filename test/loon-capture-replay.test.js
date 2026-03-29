@@ -10,6 +10,8 @@ const SCRIPT_PATH = path.join(__dirname, "..", "loon", "loon_capture_douyin_stre
 const SCRIPT_SOURCE = fs.readFileSync(SCRIPT_PATH, "utf8");
 const TOGGLE_SCRIPT_PATH = path.join(__dirname, "..", "loon", "loon_capture_toggle_sync.js");
 const TOGGLE_SCRIPT_SOURCE = fs.readFileSync(TOGGLE_SCRIPT_PATH, "utf8");
+const PLUGIN_PATH = path.join(__dirname, "..", "loon", "douyin-live-switch.plugin");
+const PLUGIN_SOURCE = fs.readFileSync(PLUGIN_PATH, "utf8");
 
 function parseRawHeaders(text) {
   const lines = text.split(/\r?\n/).filter(Boolean);
@@ -182,6 +184,30 @@ test("capture script recognizes direct 200 FLV requests", () => {
   );
 });
 
+test("capture script accepts plugin object arguments from Loon", () => {
+  const result = runCaptureScript({
+    request: {
+      method: "GET",
+      url: "http://pull-flv-l1.douyincdn.com/third/stream-test.flv?unique_id=stream-test",
+      headers: { Host: "pull-flv-l1.douyincdn.com" },
+    },
+    response: {
+      status: "200 OK",
+      headers: { "Content-Type": "video/x-flv" },
+      body: "",
+    },
+    argument: {
+      capture_enabled: true,
+    },
+  });
+
+  assert.equal(result.store["douyin-live-switch:selected_mode"], "direct_200");
+  assert.equal(
+    result.store["douyin-live-switch:selected_url"],
+    "http://pull-flv-l1.douyincdn.com/third/stream-test.flv?unique_id=stream-test",
+  );
+});
+
 test("capture script clears lock and exits immediately when capture is disabled", () => {
   const result = runCaptureScript({
     request: {
@@ -261,6 +287,21 @@ test("toggle sync resets the lock when capture is turned off and arms a fresh ca
   assert.equal(afterEnable.store["douyin-live-switch:capture_enabled_state"], "1");
 });
 
+test("toggle sync also accepts plugin object arguments from Loon", () => {
+  const afterDisable = runToggleScript({
+    argument: {
+      capture_enabled: false,
+    },
+    store: {
+      "douyin-live-switch:capture_lock": "1",
+      "douyin-live-switch:capture_enabled_state": "1",
+    },
+  });
+
+  assert.equal(afterDisable.store["douyin-live-switch:capture_lock"], "0");
+  assert.equal(afterDisable.store["douyin-live-switch:capture_enabled_state"], "0");
+});
+
 test("capture script does not replace a locked flow with another new flow while capture stays enabled", () => {
   const result = runCaptureScript({
     request: {
@@ -286,4 +327,11 @@ test("capture script does not replace a locked flow with another new flow while 
 
   assert.equal(result.store["douyin-live-switch:selected_fingerprint"], "stream-old");
   assert.equal(result.store["douyin-live-switch:selected_url"], "http://1.1.1.1/third/stream-old.flv?unique_id=stream-old");
+});
+
+test("plugin uses Loon argument list syntax instead of inline key-value placeholders", () => {
+  assert.match(PLUGIN_SOURCE, /argument=\[\{capture_enabled\}\]/);
+  assert.match(PLUGIN_SOURCE, /argument=\[\{override_url\}\]/);
+  assert.doesNotMatch(PLUGIN_SOURCE, /argument=.*capture_enabled=\{/);
+  assert.doesNotMatch(PLUGIN_SOURCE, /argument=.*override_url=\{/);
 });

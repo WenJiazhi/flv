@@ -1,22 +1,22 @@
-#!name= Douyin Live Switch
-#!desc= Capture Douyin FLV targets from 302, dispatch JSON, or direct 200 responses, then replace with the matching stable path.
-#!author= Codex
-#!homepage= https://nsloon.app/docs/Plugin/
-#!loon_version= 3.2.1(733)
-#!system= iOS,iPadOS
+#!name=Douyin Live Switch
+#!desc=Capture Douyin FLV targets from 302, dispatch JSON, or direct 200 responses, then replace matching live traffic.
+#!author=Codex
+#!homepage=https://nsloon.app/docs/Plugin/
+#!loon_version=3.2.1(733)
+#!system=iOS,iPadOS
 
 [Argument]
-override_url = input,"",tag=替换 FLV 地址,desc=可选。留空时使用最近抓到的目标地址；填写后优先使用这里的地址。
-enable_capture = switch,true,tag=抓取开关,desc=打开后只锁一条目标流。同一条流里，302 或 dispatch 会覆盖较弱的 200 直连识别。
-enable_replace = switch,false,tag=替换开关,desc=打开后按抓到的类型替换：302 改 Location，dispatch 改 JSON，200 改直连请求。
+override_url = input,"",tag=Override FLV URL,desc=Optional. Leave empty to use the most recently captured target URL.
+capture_enabled = switch,true,tag=Capture Switch,desc=Turn on to lock the first matched target. Turn off and on again to capture a new one.
+replace_enabled = switch,false,tag=Replace Switch,desc=Turn on to replace live traffic according to the captured target type.
 
 [Script]
-http-request ^https?:\/\/[^\/]*(?:douyincdn\.com|douyinliving\.com)\/.*\.flv.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_redirect_douyin_direct_request.js?v=20260329entryfix1,tag=200 直连替换,argument=override_url={override_url},enable={enable_replace}
-http-request ^https?:\/\/[^\/]*(?:douyincdn\.com|douyinliving\.com)\/ script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_capture_toggle_sync.js?v=20260329entryfix1,tag=抓取开关同步,argument=capture_enabled={enable_capture}
-http-response ^https?:\/\/[^\/]*(?:douyincdn\.com|douyinliving\.com)\/.*\.flv.*cdn_type=dispatch.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_capture_douyin_stream.js?v=20260329entryfix1,requires-body=true,tag=抓取 Dispatch JSON,argument=notify_capture=true&capture_enabled={enable_capture}
-http-response ^https?:\/\/[^\/]*(?:douyincdn\.com|douyinliving\.com)\/.*\.flv.*cdn_type=dispatch.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_rewrite_douyin_dispatch_json.js?v=20260329entryfix1,requires-body=true,tag=Dispatch 替换,argument=override_url={override_url},enable={enable_replace}
-http-response ^https?:\/\/[^\/]*(?:douyincdn\.com|douyinliving\.com)\/.*\.flv.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_capture_douyin_stream.js?v=20260329entryfix1,requires-body=false,tag=抓取 FLV 入口,argument=notify_capture=true&capture_enabled={enable_capture}
-http-response ^https?:\/\/[^\/]*(?:douyincdn\.com|douyinliving\.com)\/.*\.flv.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_rewrite_douyin_location.js?v=20260329entryfix1,requires-body=false,tag=302 替换,argument=override_url={override_url},enable={enable_replace}
+http-request ^https?:\/\/[^\/]*(?:douyincdn\.com|douyinliving\.com)\/.*\.flv.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_redirect_douyin_direct_request.js?v=20260329argfix1,tag=Replace Direct 200,argument=[{override_url}],enable={replace_enabled}
+http-request ^https?:\/\/[^\/]*(?:douyincdn\.com|douyinliving\.com)\/ script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_capture_toggle_sync.js?v=20260329argfix1,tag=Sync Capture Switch,argument=[{capture_enabled}]
+http-response ^https?:\/\/[^\/]*(?:douyincdn\.com|douyinliving\.com)\/.*\.flv.*cdn_type=dispatch.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_capture_douyin_stream.js?v=20260329argfix1,requires-body=true,tag=Capture Dispatch JSON,argument=[{capture_enabled}]
+http-response ^https?:\/\/[^\/]*(?:douyincdn\.com|douyinliving\.com)\/.*\.flv.*cdn_type=dispatch.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_rewrite_douyin_dispatch_json.js?v=20260329argfix1,requires-body=true,tag=Rewrite Dispatch JSON,argument=[{override_url}],enable={replace_enabled}
+http-response ^https?:\/\/[^\/]*(?:douyincdn\.com|douyinliving\.com)\/.*\.flv.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_capture_douyin_stream.js?v=20260329argfix1,requires-body=false,tag=Capture FLV Entry,argument=[{capture_enabled}]
+http-response ^https?:\/\/[^\/]*(?:douyincdn\.com|douyinliving\.com)\/.*\.flv.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_rewrite_douyin_location.js?v=20260329argfix1,requires-body=false,tag=Rewrite 302 Location,argument=[{override_url}],enable={replace_enabled}
 
 [MITM]
 hostname = *.douyincdn.com,*.flive.douyincdn.com,*.douyinliving.com

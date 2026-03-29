@@ -127,8 +127,10 @@ function rememberFlv(urlValue, source, sourceKeyword) {
   }
 
   const entries = parseJson(readPersistent(buildStorageKey("captured_entries"), "[]"), []);
+  const previousBest = readPersistent(buildStorageKey("best_url"), "");
   const now = Date.now();
   const existing = entries.find((item) => item.url === normalized);
+  let isNew = false;
 
   if (existing) {
     existing.hits = Number(existing.hits || 0) + 1;
@@ -138,6 +140,7 @@ function rememberFlv(urlValue, source, sourceKeyword) {
       existing.sources.push(source);
     }
   } else {
+    isNew = true;
     entries.push({
       url: normalized,
       hits: 1,
@@ -149,8 +152,14 @@ function rememberFlv(urlValue, source, sourceKeyword) {
   entries.sort((left, right) => scoreEntry(right) - scoreEntry(left));
   const trimmed = entries.slice(0, 12);
   writePersistent(buildStorageKey("captured_entries"), JSON.stringify(trimmed));
-  writePersistent(buildStorageKey("best_url"), trimmed[0] ? trimmed[0].url : "");
-  return normalized;
+  const nextBest = trimmed[0] ? trimmed[0].url : "";
+  writePersistent(buildStorageKey("best_url"), nextBest);
+  return {
+    url: normalized,
+    isNew,
+    becameBest: Boolean(nextBest) && nextBest !== previousBest && nextBest === normalized,
+    bestUrl: nextBest,
+  };
 }
 
 function collectFlvCandidatesFromResponse(responseBody, sourceKeyword) {
@@ -186,15 +195,23 @@ function collectFlvCandidatesFromResponse(responseBody, sourceKeyword) {
 
 const args = getArgumentObject();
 const sourceKeyword = String(args.source_keyword || "douyincdn.com").trim();
-const notifyCapture = String(args.notify_capture || "").toLowerCase() === "true";
+const notifyCapture = String(args.notify_capture || "true").toLowerCase() !== "false";
 const body = $response && typeof $response.body === "string" ? $response.body : "";
 const captured = collectFlvCandidatesFromResponse(body, sourceKeyword);
 
 if (captured.length && notifyCapture) {
-  const best = readPersistent(buildStorageKey("best_url"), captured[0]);
-  $notification.post("Douyin Live Switch", "已抓到 FLV 链接", best, {
-    clipboard: best,
-  });
+  const notable = captured.find((item) => item.isNew || item.becameBest) || null;
+  if (notable) {
+    const best = notable.bestUrl || notable.url;
+    $notification.post(
+      "Douyin Live Switch",
+      notable.becameBest ? "已抓到新的最佳 FLV" : "已抓到新的 FLV",
+      best,
+      {
+        clipboard: best,
+      },
+    );
+  }
 }
 
 $done({});

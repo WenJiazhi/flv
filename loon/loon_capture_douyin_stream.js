@@ -6,6 +6,7 @@ const MODE_PRIORITY = {
   redirect_302: 3,
 };
 const CAPTURE_LOCK_KEY = "capture_lock";
+const CAPTURE_LOCK_WINDOW_MS = 3000;
 
 function getArgumentObject() {
   if (typeof $argument === "object" && $argument !== null) return $argument;
@@ -218,16 +219,23 @@ if (!candidate && isHttp200Response() && isVideoFlvResponse() && $request && isD
 const candidateFingerprint = getFlowFingerprint(candidate);
 const selectedFingerprint = readPersistent(buildStorageKey("selected_fingerprint"), "");
 const selectedMode = readPersistent(buildStorageKey("selected_mode"), "");
+const selectedAt = Number(readPersistent(buildStorageKey("selected_at"), "0")) || 0;
 const lockActive = getCaptureLock() === "1";
 const allowUpgradeSameFlow =
   lockActive &&
   candidateFingerprint &&
   candidateFingerprint === selectedFingerprint &&
   getModePriority(mode) > getModePriority(selectedMode);
+const allowReplaceExpiredLock =
+  lockActive &&
+  candidateFingerprint &&
+  selectedFingerprint &&
+  candidateFingerprint !== selectedFingerprint &&
+  Date.now() - selectedAt >= CAPTURE_LOCK_WINDOW_MS;
 
 let finalResult = { stored: false, selected: "", mode: "" };
 
-if (!lockActive || allowUpgradeSameFlow) {
+if (!lockActive || allowUpgradeSameFlow || allowReplaceExpiredLock) {
   finalResult = storeCapturedUrl(candidate, mode);
   if (finalResult.stored) {
     setCaptureLock(true);

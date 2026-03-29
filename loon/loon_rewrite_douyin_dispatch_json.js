@@ -51,6 +51,7 @@ function isRedirectTargetFlvUrl(urlValue) {
         lowerPath.includes("/stage/") ||
         lowerPath.includes("/thirdgame/") ||
         lowerSearch.includes("douyincdn.com") ||
+        lowerSearch.includes("douyinliving.com") ||
         lowerSearch.includes("domain=") ||
         lowerSearch.includes("vhost=") ||
         lowerSearch.includes("fp_user_url=") ||

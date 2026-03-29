@@ -35,7 +35,11 @@ function isDirectCdnFlvUrl(urlValue) {
   if (!sanitized) return false;
   try {
     const url = new URL(sanitized);
-    return url.hostname.toLowerCase().includes("douyincdn.com") && url.pathname.toLowerCase().endsWith(".flv");
+    const hostname = url.hostname.toLowerCase();
+    return (
+      (hostname.includes("douyincdn.com") || hostname.includes("douyinliving.com")) &&
+      url.pathname.toLowerCase().endsWith(".flv")
+    );
   } catch {
     return false;
   }

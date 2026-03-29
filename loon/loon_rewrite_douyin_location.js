@@ -42,7 +42,10 @@ function shouldRewriteLocation(locationHeader) {
   const sanitized = sanitizeUrlCandidate(locationHeader);
   if (!sanitized) return false;
   const lower = sanitized.toLowerCase();
-  return lower.includes(".flv") && (lower.includes("douyincdn.com") || /^http:\/\/\d{1,3}(?:\.\d{1,3}){3}\//.test(lower));
+  return (
+    lower.includes(".flv") &&
+    (lower.includes("douyincdn.com") || lower.includes("douyinliving.com") || /^http:\/\/\d{1,3}(?:\.\d{1,3}){3}\//.test(lower))
+  );
 }
 
 const args = getArgumentObject();

@@ -50,7 +50,11 @@ function isDirectCdnFlvUrl(urlValue) {
   if (!sanitized) return false;
   try {
     const url = new URL(sanitized);
-    return url.hostname.toLowerCase().includes("douyincdn.com") && url.pathname.toLowerCase().endsWith(".flv");
+    const hostname = url.hostname.toLowerCase();
+    return (
+      (hostname.includes("douyincdn.com") || hostname.includes("douyinliving.com")) &&
+      url.pathname.toLowerCase().endsWith(".flv")
+    );
   } catch {
     return false;
   }
@@ -73,6 +77,7 @@ function isRedirectTargetFlvUrl(urlValue) {
         lowerPath.includes("/stage/") ||
         lowerPath.includes("/thirdgame/") ||
         lowerSearch.includes("douyincdn.com") ||
+        lowerSearch.includes("douyinliving.com") ||
         lowerSearch.includes("domain=") ||
         lowerSearch.includes("vhost=") ||
         lowerSearch.includes("fp_user_url=") ||

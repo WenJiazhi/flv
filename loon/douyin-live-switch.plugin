@@ -8,12 +8,11 @@
 [Argument]
 override_url = input,"",tag=替换 FLV 地址,desc=可选。留空时使用最近抓到的第一跳 Location 地址；填写后强制替换成这里的地址。
 enable_capture = switch,true,tag=抓取开关,desc=只抓第一跳 302 Location 里的目标 FLV，并去重保存。
-enable_replace = switch,false,tag=替换开关,desc=打开后只改第一跳 302 Location，不再改第二跳请求。
+enable_replace = switch,false,tag=替换开关,desc=打开后只改第一跳 302 Location。这是当前最稳定的替换方式。
 
 [Script]
 http-response ^https?:\/\/[^\/]*douyincdn\.com\/.*\.flv.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_capture_douyin_stream.js,requires-body=false,tag=抓取第一跳 FLV,argument=notify_capture=true,enable={enable_capture}
 http-response ^https?:\/\/[^\/]*douyincdn\.com\/.*\.flv.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_rewrite_douyin_location.js,requires-body=false,tag=替换 302 Location,argument=override_url={override_url},enable={enable_replace}
-http-request ^https?:\/\/[^\/]*douyincdn\.com\/.*\.flv.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_redirect_douyin_firsthop_request.js,tag=兜底重定向第一跳 FLV,argument=override_url={override_url},enable={enable_replace}
 
 [MITM]
 hostname = *.douyincdn.com

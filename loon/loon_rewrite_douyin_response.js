@@ -119,7 +119,7 @@ function rememberFlv(urlValue, source, sourceKeyword) {
     }
   } else {
     entries.push({
-      url: normalized,
+      url: sanitized,
       hits: 1,
       seenAt: now,
       sources: source ? [source] : [],
@@ -151,6 +151,8 @@ function getPreferredOverride(args) {
   }
 
   return (
+    sanitizeUrlCandidate(readPersistent(buildStorageKey("selected_location_url"), "")) ||
+    sanitizeUrlCandidate(readPersistent(buildStorageKey("selected_url"), "")) ||
     sanitizeUrlCandidate(readPersistent(buildStorageKey("best_location_url"), "")) ||
     explicit ||
     sanitizeUrlCandidate(readPersistent(buildStorageKey("best_url"), ""))
@@ -167,6 +169,12 @@ function replaceFlvUrlsInText(text, replacementUrl, sourceKeyword) {
       return candidate;
     }
     return replacementUrl;
+  });
+}
+
+function notifyReplacement(stage, replacementUrl) {
+  $notification.post("Douyin Live Switch", `替换成功: ${stage}`, replacementUrl, {
+    clipboard: replacementUrl,
   });
 }
 
@@ -191,6 +199,7 @@ if (!$response || typeof $response.body !== "string" || !$response.body) {
       const headers = Object.assign({}, $response.headers || {});
       delete headers["Content-Length"];
       delete headers["content-length"];
+      notifyReplacement("房间配置", replacementUrl);
       $done({
         status: $response.status,
         headers,

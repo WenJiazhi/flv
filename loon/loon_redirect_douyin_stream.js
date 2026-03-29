@@ -76,10 +76,18 @@ function getPreferredOverride(args) {
   }
 
   return (
+    sanitizeUrlCandidate(readPersistent(buildStorageKey("selected_location_url"), "")) ||
+    sanitizeUrlCandidate(readPersistent(buildStorageKey("selected_url"), "")) ||
     sanitizeUrlCandidate(readPersistent(buildStorageKey("best_location_url"), "")) ||
     explicit ||
     sanitizeUrlCandidate(readPersistent(buildStorageKey("best_url"), ""))
   );
+}
+
+function notifyReplacement(stage, replacementUrl) {
+  $notification.post("Douyin Live Switch", `替换成功: ${stage}`, replacementUrl, {
+    clipboard: replacementUrl,
+  });
 }
 
 const args = getArgumentObject();
@@ -97,6 +105,7 @@ if (!replacementUrl || !shouldKeepFlv($request.url)) {
     // Ignore parsing failures.
   }
 
+  notifyReplacement("请求重定向", replacementUrl);
   $done({
     url: replacementUrl,
     headers,

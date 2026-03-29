@@ -113,6 +113,22 @@ function scoreEntry(entry) {
   return score;
 }
 
+function lockReplacementUrl(urlValue) {
+  if (!isLocationStyleUrl(urlValue)) {
+    return false;
+  }
+
+  const selectedLocationUrl = readPersistent(buildStorageKey("selected_location_url"), "");
+  if (selectedLocationUrl) {
+    return false;
+  }
+
+  writePersistent(buildStorageKey("selected_location_url"), urlValue);
+  writePersistent(buildStorageKey("selected_url"), urlValue);
+  writePersistent(buildStorageKey("selected_at"), Date.now());
+  return true;
+}
+
 function rememberFlv(urlValue, source, sourceKeyword) {
   const sanitized = sanitizeUrlCandidate(urlValue);
   if (!shouldKeepFlv(sanitized, sourceKeyword)) {
@@ -156,6 +172,9 @@ function rememberFlv(urlValue, source, sourceKeyword) {
     writePersistent(buildStorageKey("best_location_url"), bestLocationUrl);
   }
 
+  const lockedNow = lockReplacementUrl(sanitized);
+  const selectedLocationUrl = readPersistent(buildStorageKey("selected_location_url"), "");
+
   return {
     url: sanitized,
     isNew,
@@ -164,8 +183,10 @@ function rememberFlv(urlValue, source, sourceKeyword) {
       isLocationStyleUrl(sanitized) &&
       Boolean(bestLocationUrl) &&
       bestLocationUrl !== previousLocation,
+    lockedNow,
     bestUrl,
     bestLocationUrl,
+    selectedLocationUrl,
   };
 }
 
@@ -209,13 +230,11 @@ const body = $response && typeof $response.body === "string" ? $response.body : 
 const captured = collectFlvCandidatesFromResponse(body, sourceKeyword);
 
 if (captured.length && notifyCapture) {
-  const notable = captured.find((item) => item.becameBestLocation || isLocationStyleUrl(item.url)) || null;
+  const notable = captured.find((item) => item.lockedNow) || null;
 
   if (notable) {
-    const text = notable.bestLocationUrl || notable.bestUrl || notable.url;
-    const title = "已抓到新的 IP FLV";
-
-    $notification.post("Douyin Live Switch", title, text, {
+    const text = notable.selectedLocationUrl || notable.url;
+    $notification.post("Douyin Live Switch", "已锁定替换直播流", text, {
       clipboard: text,
     });
   }

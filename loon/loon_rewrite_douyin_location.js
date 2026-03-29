@@ -61,10 +61,18 @@ function getPreferredOverride(args) {
   }
 
   return (
+    sanitizeUrlCandidate(readPersistent(buildStorageKey("selected_location_url"), "")) ||
+    sanitizeUrlCandidate(readPersistent(buildStorageKey("selected_url"), "")) ||
     sanitizeUrlCandidate(readPersistent(buildStorageKey("best_location_url"), "")) ||
     explicit ||
     sanitizeUrlCandidate(readPersistent(buildStorageKey("best_url"), ""))
   );
+}
+
+function notifyReplacement(stage, replacementUrl) {
+  $notification.post("Douyin Live Switch", `替换成功: ${stage}`, replacementUrl, {
+    clipboard: replacementUrl,
+  });
 }
 
 const args = getArgumentObject();
@@ -81,6 +89,7 @@ if (!$response || !$response.headers || !replacementUrl) {
   } else {
     headers.Location = replacementUrl;
     headers.location = replacementUrl;
+    notifyReplacement("302 Location", replacementUrl);
     $done({
       status: $response.status,
       headers,

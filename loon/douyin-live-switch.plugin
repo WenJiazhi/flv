@@ -1,23 +1,20 @@
 #!name= Douyin Live Switch
-#!desc= Capture Douyin live FLV chains and replace all matching live streams with one target stream.
+#!desc= Capture the first Douyin FLV redirect and replace all live playback with that stream.
 #!author= Codex
 #!homepage= https://nsloon.app/docs/Plugin/
 #!loon_version= 3.2.1(733)
 #!system= iOS,iPadOS
 
 [Argument]
-override_url = input,"",tag=替换 FLV 地址,desc=填入要替换成的 FLV 直播流；支持 http://IP/域名/...，脚本会自动规范化。
-enable_capture = switch,true,tag=抓取开关,desc=抓取房间接口、302 跳转和实际 FLV 请求里的直播地址。
-enable_replace = switch,false,tag=替换开关,desc=打开后自动把直播流替换成“替换 FLV 地址”；如果留空，就自动用最近抓到的地址。
+override_url = input,"",tag=替换 FLV 地址,desc=可选。留空时使用第一次抓到的 IP FLV；填写后强制替换成这里的地址。
+enable_capture = switch,true,tag=抓取开关,desc=只抓第一跳 302 Location 里的 IP FLV，并锁定第一次抓到的结果。
+enable_replace = switch,false,tag=替换开关,desc=打开后把所有命中的直播播放都替换成已锁定的 FLV。
 
 [Script]
-http-response ^https?:\/\/(?:[^\/]+\.)?(?:live\.douyin\.com|api(?:-play)?\.amemv\.com|webcast\d*[-\w]*\.amemv\.com|webcast\d*[-\w]*\.douyin\.com)\/.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_capture_douyin_stream.js,requires-body=true,tag=抓取抖音直播流,argument=source_keyword=douyincdn.com&notify_capture=true,enable={enable_capture}
-http-response ^https?:\/\/(?:[^\/]+\.)?(?:live\.douyin\.com|api(?:-play)?\.amemv\.com|webcast\d*[-\w]*\.amemv\.com|webcast\d*[-\w]*\.douyin\.com)\/.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_rewrite_douyin_response.js,requires-body=true,tag=重写抖音直播配置,argument=override_url={override_url}&use_captured=true&source_keyword=douyincdn.com,enable={enable_replace}
-http-response ^https?:\/\/[^\/]*douyincdn\.com\/.*\.flv.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_capture_douyin_stream.js,requires-body=false,tag=抓取 CDN FLV,argument=source_keyword=douyincdn.com&notify_capture=true,enable={enable_capture}
-http-response ^https?:\/\/[^\/]*douyincdn\.com\/.*\.flv.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_rewrite_douyin_location.js,requires-body=false,tag=改写 CDN 302 Location,argument=override_url={override_url}&use_captured=true,enable={enable_replace}
-http-response ^http:\/\/\d{1,3}(?:\.\d{1,3}){3}\/[^?]*pull-flv[^?]*\.flv.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_capture_douyin_stream.js,requires-body=false,tag=抓取 IP FLV,argument=source_keyword=douyincdn.com&notify_capture=true,enable={enable_capture}
-http-request ^https?:\/\/[^\/]*douyincdn\.com\/.*\.flv.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_redirect_douyin_stream.js,tag=重定向 CDN FLV 请求,argument=override_url={override_url}&use_captured=true,enable={enable_replace}
-http-request ^http:\/\/\d{1,3}(?:\.\d{1,3}){3}\/[^?]*pull-flv[^?]*\.flv.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_redirect_douyin_stream.js,tag=重定向 IP FLV 请求,argument=override_url={override_url}&use_captured=true,enable={enable_replace}
+http-response ^https?:\/\/[^\/]*douyincdn\.com\/.*\.flv.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_capture_douyin_stream.js,requires-body=false,tag=抓取第一跳 FLV,argument=source_keyword=douyincdn.com&notify_capture=true,enable={enable_capture}
+http-response ^https?:\/\/[^\/]*douyincdn\.com\/.*\.flv.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_rewrite_douyin_location.js,requires-body=false,tag=替换 302 Location,argument=override_url={override_url}&use_captured=true,enable={enable_replace}
+http-response ^http:\/\/\d{1,3}(?:\.\d{1,3}){3}\/[^?]*pull-flv[^?]*\.flv.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_capture_douyin_stream.js,requires-body=false,tag=抓取第二跳 FLV,argument=source_keyword=douyincdn.com&notify_capture=true,enable={enable_capture}
+http-request ^http:\/\/\d{1,3}(?:\.\d{1,3}){3}\/[^?]*pull-flv[^?]*\.flv.* script-path=https://raw.githubusercontent.com/WenJiazhi/flv/main/loon/loon_redirect_douyin_stream.js,tag=重定向第二跳 FLV,argument=override_url={override_url}&use_captured=true,enable={enable_replace}
 
 [MITM]
-hostname = live.douyin.com, *.live.douyin.com, api.amemv.com, api-play.amemv.com, webcast.amemv.com, *.amemv.com, *.douyin.com
+hostname = *.douyincdn.com
